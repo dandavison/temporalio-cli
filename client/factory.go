@@ -5,6 +5,7 @@ import (
 	"crypto/tls"
 	"crypto/x509"
 	"errors"
+	"fmt"
 	"io"
 	"net"
 	"net/http"
@@ -115,18 +116,13 @@ func (b *clientFactory) OperatorClient(c *cli.Context) operatorservice.OperatorS
 
 // SDKClient builds an SDK client.
 func (b *clientFactory) SDKClient(c *cli.Context, namespace string) sdkclient.Client {
-	hostPort := c.String(common.FlagAddress)
-	if hostPort == "" {
-		hostPort = common.LocalHostPort
-	}
-
 	tlsConfig, err := b.createTLSConfig(c)
 	if err != nil {
 		b.logger.Fatal("Failed to configure TLS for SDK client", tag.Error(err))
 	}
 
 	sdkClient, err := sdkclient.Dial(sdkclient.Options{
-		HostPort:  hostPort,
+		HostPort:  getHostPort(c),
 		Namespace: namespace,
 		Logger:    log.NewSdkLogger(b.logger),
 		Identity:  common.GetCliIdentity(),
@@ -191,10 +187,6 @@ func errorInterceptor() grpc.UnaryClientInterceptor {
 }
 
 func (b *clientFactory) createGRPCConnection(c *cli.Context) (*grpc.ClientConn, error) {
-	hostPort := c.String(common.FlagAddress)
-	if hostPort == "" {
-		hostPort = common.LocalHostPort
-	}
 
 	tlsConfig, err := b.createTLSConfig(c)
 	if err != nil {
@@ -217,7 +209,7 @@ func (b *clientFactory) createGRPCConnection(c *cli.Context) (*grpc.ClientConn, 
 		grpc.WithChainUnaryInterceptor(interceptors...),
 	}
 
-	connection, err := grpc.Dial(hostPort, dialOpts...)
+	connection, err := grpc.Dial(getHostPort(c), dialOpts...)
 	if err != nil {
 		b.logger.Fatal("Failed to create connection", tag.Error(err))
 		return nil, err
@@ -258,12 +250,8 @@ func (b *clientFactory) createTLSConfig(c *cli.Context) (*tls.Config, error) {
 		if serverName != "" {
 			host = serverName
 		} else {
-			hostPort := c.String(common.FlagAddress)
-			if hostPort == "" {
-				hostPort = common.LocalHostPort
-			}
 			// Ignoring error as we'll fail to dial anyway, and that will produce a meaningful error
-			host, _, _ = net.SplitHostPort(hostPort)
+			host, _, _ = net.SplitHostPort(getHostPort(c))
 		}
 		tlsConfig := auth.NewTLSConfigForServer(host, !disableHostNameVerification)
 		if caPool != nil {
@@ -283,12 +271,8 @@ func (b *clientFactory) createTLSConfig(c *cli.Context) (*tls.Config, error) {
 	}
 	// If we are given a TLS flag, set the TLS server name from the address
 	if enableTLS {
-		hostPort := c.String(common.FlagAddress)
-		if hostPort == "" {
-			hostPort = common.LocalHostPort
-		}
 		// Ignoring error as we'll fail to dial anyway, and that will produce a meaningful error
-		host, _, _ = net.SplitHostPort(hostPort)
+		host, _, _ = net.SplitHostPort(getHostPort(c))
 		tlsConfig := auth.NewTLSConfigForServer(host, !disableHostNameVerification)
 		return tlsConfig, nil
 	}
@@ -325,4 +309,20 @@ func fetchCACert(pathOrUrl string) (caPool *x509.CertPool, err error) {
 		return nil, errors.New("unknown failure constructing cert pool for ca")
 	}
 	return caPool, nil
+}
+
+func getHostPort(c *cli.Context) string {
+	hostPort := c.String(common.FlagAddress)
+	if hostPort == "" {
+		host := c.String(common.FlagIP)
+		if host != "" {
+			hostPort = fmt.Sprintf("%s:%d", host, c.Int(common.FlagPort))
+		}
+	}
+	if hostPort == "" {
+		hostPort = common.LocalHostPort
+	}
+	fmt.Printf("****************** %s\n", hostPort)
+	os.Exit(2)
+	return hostPort
 }
