@@ -155,12 +155,14 @@ func StartWorkflow(c *cli.Context, printProgress bool) error {
 	data := []interface{}{
 		executionDetails,
 	}
-	fmt.Println(color.Magenta(c, "Running execution:"))
 	opts := &output.PrintOptions{
 		Fields:       []string{"WorkflowId", "RunId", "Type", "Namespace", "TaskQueue", "Args"},
 		ForceFields:  true,
 		OutputFormat: output.Card,
 		Separator:    "",
+	}
+	if getOutputFormat(c, opts) != JSON {
+		fmt.Println(color.Magenta(c, "Running execution:"))
 	}
 	err = output.PrintItems(c, data, opts)
 	if err != nil {
