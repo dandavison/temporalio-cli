@@ -303,6 +303,7 @@ func printWorkflowProgress(c *cli.Context, wid, rid string, watch bool) error {
 
 	errChan := make(chan error)
 	go func() {
+		common.LogToFile("GetDecodedWorkflowHistory...", "", "green")
 		iter := common.GetDecodedWorkflowHistory(tcCtx, wid, rid, watch, sdkClient)
 
 		if isJSON {
@@ -357,10 +358,12 @@ func printWorkflowProgress(c *cli.Context, wid, rid string, watch bool) error {
 }
 
 func printReplayableHistory(c *cli.Context, iter iterator.Iterator[*historypb.HistoryEvent]) error {
+	common.LogToFile("printReplayableHistory", "", "green")
 	var events []*historypb.HistoryEvent
 	for iter.HasNext() {
 		event, err := iter.Next()
 		if err != nil {
+			common.LogToFile(fmt.Sprintf("printReplayableHistory: error: %v", err), "", "red")
 			return err
 
 		}

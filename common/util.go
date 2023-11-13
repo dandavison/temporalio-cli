@@ -171,6 +171,7 @@ func GetCurrentUserFromEnv() string {
 }
 
 func PrettyPrintJSONObject(c *cli.Context, o interface{}) {
+	LogToFile("PrettyPrintJSONObject", "", "green")
 	var b []byte
 	var err error
 	if pb, ok := o.(proto.Message); ok {

@@ -5,6 +5,7 @@ import (
 	"crypto/tls"
 	"crypto/x509"
 	"errors"
+	"fmt"
 	"io"
 	"net"
 	"net/http"
@@ -157,6 +158,7 @@ func configureSDK(ctx *cli.Context) error {
 			ctx.String(common.FlagNamespace),
 			ctx.String(common.FlagCodecAuth),
 		)
+		common.LogToFile(fmt.Sprintf("codec-endpoint: set dataconverter endpoint: %s\n", endpoint), "", "blue")
 	}
 
 	md, err := common.SplitKeyValuePairs(ctx.StringSlice(common.FlagMetadata))

@@ -3,6 +3,7 @@ package common
 import (
 	"context"
 	"errors"
+	"fmt"
 
 	"github.com/temporalio/cli/dataconverter"
 	"go.temporal.io/api/common/v1"
@@ -29,18 +30,23 @@ func (h DecodedHistoryEventIterator) HasNext() bool {
 }
 
 func (h DecodedHistoryEventIterator) Next() (*historypb.HistoryEvent, error) {
+	LogToFile("Next", "", "green")
 	ev, err := h.iter.Next()
 	if err != nil {
+		LogToFile(fmt.Sprintf("Next: err: %v", err), "", "red")
 		return nil, err
 	}
 	for _, payload := range getPayloads(ev) {
+		LogToFile(fmt.Sprintf("converting payload with encoding: %s\n%v", string(payload.Metadata[converter.MetadataEncoding]), payload.Data), "", "green")
 		var data string
 		if err := h.dataConverter.FromPayload(payload, &data); err != nil {
 			// TODO (dan): can we detect up-front absence of a payload converter for
 			// the encoding, instead of letting it error?
 			if errors.Is(err, converter.ErrEncodingIsNotSupported) {
+				LogToFile(fmt.Sprintf("Next converter err is ErrEncodingIsNotSupported: %v", err), "", "red")
 				continue
 			}
+			LogToFile(fmt.Sprintf("Next converter err: %v", err), "", "red")
 			return nil, err
 		}
 		payload.Data = []byte(data)
