@@ -1,10 +1,8 @@
 package common
 
 import (
-	"context"
 	"errors"
 
-	"github.com/temporalio/cli/dataconverter"
 	"go.temporal.io/api/common/v1"
 	enumspb "go.temporal.io/api/enums/v1"
 	historypb "go.temporal.io/api/history/v1"
@@ -13,31 +11,24 @@ import (
 )
 
 type (
-	DecodedHistoryEventIterator struct {
-		iter          sdkclient.HistoryEventIterator
-		dataConverter converter.DataConverter
+	DecodedPayloadsHistoryEventIterator struct {
+		Iter          sdkclient.HistoryEventIterator
+		DataConverter converter.DataConverter
 	}
 )
 
-func GetDecodedWorkflowHistory(ctx context.Context, workflowID string, runID string, watch bool,
-	eventFilter enumspb.HistoryEventFilterType, sdkClient sdkclient.Client) DecodedHistoryEventIterator {
-
-	iter := sdkClient.GetWorkflowHistory(ctx, workflowID, runID, watch, eventFilter)
-	return DecodedHistoryEventIterator{iter, dataconverter.CustomDataConverter()}
+func (h DecodedPayloadsHistoryEventIterator) HasNext() bool {
+	return h.Iter.HasNext()
 }
 
-func (h DecodedHistoryEventIterator) HasNext() bool {
-	return h.iter.HasNext()
-}
-
-func (h DecodedHistoryEventIterator) Next() (*historypb.HistoryEvent, error) {
-	ev, err := h.iter.Next()
+func (h DecodedPayloadsHistoryEventIterator) Next() (*historypb.HistoryEvent, error) {
+	ev, err := h.Iter.Next()
 	if err != nil {
 		return nil, err
 	}
 	for _, payload := range getPayloads(ev) {
 		var data string
-		if err := h.dataConverter.FromPayload(payload, &data); err != nil {
+		if err := h.DataConverter.FromPayload(payload, &data); err != nil {
 			// TODO (dan): can we detect up-front absence of a payload converter for
 			// the encoding, instead of letting it error?
 			if errors.Is(err, converter.ErrEncodingIsNotSupported) {

@@ -303,10 +303,10 @@ func printWorkflowProgress(c *cli.Context, wid, rid string, watch bool) error {
 
 	errChan := make(chan error)
 	go func() {
-		iter := common.GetDecodedWorkflowHistory(tcCtx, wid, rid, watch, enumspb.HISTORY_EVENT_FILTER_TYPE_ALL_EVENT, sdkClient)
-
+		iter := sdkClient.GetWorkflowHistory(tcCtx, wid, rid, watch, enumspb.HISTORY_EVENT_FILTER_TYPE_ALL_EVENT)
 		if isJSON {
-			printReplayableHistory(c, iter)
+			hIter := common.DecodedPayloadsHistoryEventIterator{Iter: iter, DataConverter: dataconverter.CustomDataConverter()}
+			printReplayableHistory(c, hIter)
 		} else {
 			hIter := &historyTableIter{iter: iter, maxFieldLength: maxFieldLength, wfResult: &wfResult}
 			po := &output.PrintOptions{
