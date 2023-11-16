@@ -12,15 +12,19 @@ import (
 	"strings"
 	"time"
 
+	"go.temporal.io/api/proxy"
+
 	"github.com/gogo/status"
 	"github.com/temporalio/cli/common"
 	"github.com/temporalio/cli/dataconverter"
 	"github.com/temporalio/cli/headersprovider"
 	"github.com/urfave/cli/v2"
+	commonpb "go.temporal.io/api/common/v1"
 	"go.temporal.io/api/operatorservice/v1"
 	"go.temporal.io/api/serviceerror"
 	"go.temporal.io/api/workflowservice/v1"
 	sdkclient "go.temporal.io/sdk/client"
+	"go.temporal.io/sdk/converter"
 	"go.temporal.io/server/common/auth"
 	"go.temporal.io/server/common/log"
 	"go.temporal.io/server/common/log/tag"
@@ -125,21 +129,55 @@ func (b *clientFactory) SDKClient(c *cli.Context, namespace string) sdkclient.Cl
 		b.logger.Fatal("Failed to configure TLS for SDK client", tag.Error(err))
 	}
 
+	interceptor, err := payloadDecoderGRPCClientInterceptor(dataconverter.CustomDataConverter())
+	if err != nil {
+		b.logger.Fatal("Failed to configure payload data converter for SDK client", tag.Error(err))
+	}
+
 	sdkClient, err := sdkclient.Dial(sdkclient.Options{
 		HostPort:  hostPort,
 		Namespace: namespace,
 		Logger:    log.NewSdkLogger(b.logger),
 		Identity:  common.GetCliIdentity(),
 		ConnectionOptions: sdkclient.ConnectionOptions{
+			DialOptions: []grpc.DialOption{
+				grpc.WithChainUnaryInterceptor(interceptor)},
 			TLS: tlsConfig,
 		},
 		HeadersProvider: headersprovider.GetCurrent(),
 	})
+
 	if err != nil {
 		b.logger.Fatal("Failed to create SDK client", tag.Error(err))
 	}
 
 	return sdkClient
+}
+
+func payloadDecoderGRPCClientInterceptor(dataConverter converter.DataConverter) (grpc.UnaryClientInterceptor, error) {
+	return proxy.NewPayloadVisitorInterceptor(proxy.PayloadVisitorInterceptorOptions{
+		Inbound: &proxy.VisitPayloadsOptions{
+			Visitor: func(vpc *proxy.VisitPayloadsContext, payloads []*commonpb.Payload) ([]*commonpb.Payload, error) {
+				for _, payload := range payloads {
+					var data string
+					if err := dataConverter.FromPayload(payload, &data); err != nil {
+						// TODO (dan): should we detect up-front absence of a payload
+						// converter for the encoding, instead of letting it error?
+						if errors.Is(err, converter.ErrEncodingIsNotSupported) {
+							continue
+						}
+						return nil, err
+					}
+					payload.Data = []byte(data)
+					// TODO (dan): what encoding do we set this to to communicate that it is
+					// the base64-encoded output of the remote decoder?
+					payload.Metadata[converter.MetadataEncoding] = []byte{}
+				}
+				return payloads, nil
+			},
+			SkipSearchAttributes: true,
+		},
+	})
 }
 
 // HealthClient builds a health client.
