@@ -129,7 +129,7 @@ func (b *clientFactory) SDKClient(c *cli.Context, namespace string) sdkclient.Cl
 		b.logger.Fatal("Failed to configure TLS for SDK client", tag.Error(err))
 	}
 
-	interceptor, err := payloadDecoderGRPCClientInterceptor(dataconverter.CustomDataConverter())
+	interceptor, err := converter.NewPayloadCodecGRPCClientInterceptor(converter.PayloadCodecGRPCClientInterceptorOptions{Codecs: []converter.PayloadCodec{dataconverter.CustomPayloadCodec()}})
 	if err != nil {
 		b.logger.Fatal("Failed to configure payload data converter for SDK client", tag.Error(err))
 	}
