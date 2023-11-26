@@ -154,32 +154,6 @@ func (b *clientFactory) SDKClient(c *cli.Context, namespace string) sdkclient.Cl
 	return sdkClient
 }
 
-func payloadDecoderGRPCClientInterceptor(dataConverter converter.DataConverter) (grpc.UnaryClientInterceptor, error) {
-	return proxy.NewPayloadVisitorInterceptor(proxy.PayloadVisitorInterceptorOptions{
-		Inbound: &proxy.VisitPayloadsOptions{
-			Visitor: func(vpc *proxy.VisitPayloadsContext, payloads []*commonpb.Payload) ([]*commonpb.Payload, error) {
-				for _, payload := range payloads {
-					var data string
-					if err := dataConverter.FromPayload(payload, &data); err != nil {
-						// TODO (dan): should we detect up-front absence of a payload
-						// converter for the encoding, instead of letting it error?
-						if errors.Is(err, converter.ErrEncodingIsNotSupported) {
-							continue
-						}
-						return nil, err
-					}
-					payload.Data = []byte(data)
-					// TODO (dan): what encoding do we set this to to communicate that it is
-					// the base64-encoded output of the remote decoder?
-					payload.Metadata[converter.MetadataEncoding] = []byte{}
-				}
-				return payloads, nil
-			},
-			SkipSearchAttributes: true,
-		},
-	})
-}
-
 // HealthClient builds a health client.
 func (b *clientFactory) HealthClient(c *cli.Context) healthpb.HealthClient {
 	connection, _ := b.createGRPCConnection(c)
