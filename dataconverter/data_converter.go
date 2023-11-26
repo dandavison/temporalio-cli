@@ -16,11 +16,7 @@ func DefaultDataConverter() converter.DataConverter {
 }
 
 func CustomDataConverter() converter.DataConverter {
-	return GetCurrent()
-}
-
-func SetCurrent(dc converter.DataConverter) {
-	dataConverter = dc
+	return dataConverter
 }
 
 func SetRemoteEndpoint(endpoint string, namespace string, auth string) {
@@ -40,8 +36,4 @@ func SetRemoteEndpoint(endpoint string, namespace string, auth string) {
 			},
 		},
 	)
-}
-
-func GetCurrent() converter.DataConverter {
-	return dataConverter
 }
