@@ -1,0 +1,17 @@
+#!/bin/sh
+
+executable="$1"
+[ -n "$executable" ] || {
+    echo "usage $(basename $0) <temporal-executable>" 1>&2
+    exit 1
+}
+
+list() {
+    local c
+    for c in $("$@" --generate-bash-completion | sed 's%:.*%%' | grep -v '^h$' | grep -v '^help$'); do
+        echo "$@" "$c"
+        list "$@" "$c"
+    done
+}
+
+list "$executable"
