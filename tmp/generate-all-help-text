@@ -1,15 +1,18 @@
-#!/bin/sh
-
+#!/usr/bin/env bash
 executable="$1"
 [ -n "$executable" ] || {
     echo "usage $(basename $0) <temporal-executable>" 1>&2
     exit 1
 }
+shift
+
+while getopts 
 
 list() {
     local c
     for c in $("$@" --generate-bash-completion | sed 's%:.*%%' | grep -v '^h$' | grep -v '^help$'); do
         echo "$@" "$c"
+        # "$@" "$c" --help
         list "$@" "$c"
     done
 }
