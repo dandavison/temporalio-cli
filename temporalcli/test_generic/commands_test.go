@@ -22,10 +22,31 @@ import (
 	"go.temporal.io/sdk/workflow"
 )
 
+type CommandOptions struct {
+	// If empty, assumed to be os.Args[1:]
+	Args []string
+	// If unset, defaulted to $HOME/.config/temporalio/temporal.yaml
+	EnvConfigFile string
+	// If unset, attempts to extract --env from Args (which defaults to "default")
+	EnvConfigName string
+	// If true, does not do any env config reading
+	DisableEnvConfig bool
+	// If nil, os.LookupEnv is used. This is for environment variables and not
+	// related to env config stuff above.
+	LookupEnv func(string) (string, bool)
+
+	// These two fields below default to OS values
+	Stdout io.Writer
+	Stderr io.Writer
+
+	// Defaults to logging error then os.Exit(1)
+	Fail func(error)
+}
+
 type CommandHarness struct {
 	*require.Assertions
 	t       *testing.T
-	Options temporalcli.CommandOptions
+	Options CommandOptions
 	// Defaults to a context closed on close or test complete
 	Context context.Context
 	// Can be used to cancel context given to commands (simulating interrupt)
@@ -75,6 +96,34 @@ type CommandResult struct {
 	Stderr bytes.Buffer
 }
 
+func NewCommandContext(ctx context.Context, options CommandOptions) (*CommandContext, context.CancelFunc, error) {
+	cctx := &CommandContext{Context: ctx, Options: options}
+	if err := cctx.preprocessOptions(); err != nil {
+		return nil, nil, err
+	}
+
+	// Setup interrupt handler
+	ctx, stop := signal.NotifyContext(ctx, os.Interrupt, syscall.SIGTERM)
+	cctx.Context = ctx
+	return cctx, stop, nil
+}
+
+func Execute(ctx context.Context, options CommandOptions) {
+	// Create context and run
+	cctx, cancel, err := NewCommandContext(ctx, options)
+	if err == nil {
+		defer cancel()
+		cmd := NewTemporalCommand(cctx)
+		cmd.Command.SetArgs(cctx.Options.Args)
+		err = cmd.Command.ExecuteContext(cctx)
+	}
+
+	// Use failure handler, but can still return
+	if err != nil {
+		cctx.Options.Fail(err)
+	}
+}
+
 func (h *CommandHarness) Execute(args ...string) *CommandResult {
 	// Copy options, update as needed
 	res := &CommandResult{}
@@ -98,7 +147,7 @@ func (h *CommandHarness) Execute(args ...string) *CommandResult {
 	h.t.Cleanup(cancel)
 	defer cancel()
 	h.t.Logf("Calling: %v", strings.Join(args, " "))
-	temporalcli.Execute(ctx, options)
+	Execute(ctx, options)
 	if res.Stdout.Len() > 0 {
 		h.t.Logf("Stdout:\n-----\n%s\n-----", &res.Stdout)
 	}
