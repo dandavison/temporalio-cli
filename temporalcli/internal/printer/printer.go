@@ -59,6 +59,8 @@ type StructuredOptions struct {
 	// printing.
 	Table                        *TableOptions
 	OverrideJSONPayloadShorthand *bool
+	JSONSuffix                   string
+	JSONPrefix                   string
 }
 
 type Align int
@@ -175,18 +177,18 @@ func (p *Printer) printJSON(v any, options StructuredOptions) error {
 	if options.OverrideJSONPayloadShorthand != nil {
 		shorthandPayloads = *options.OverrideJSONPayloadShorthand
 	}
-	b, err := p.jsonVal(v, p.JSONIndent, shorthandPayloads)
+	b, err := p.jsonVal(v, options.JSONPrefix, p.JSONIndent, shorthandPayloads)
 	if err != nil {
 		return err
 	}
 	_, err = p.Output.Write(b)
-	if err == nil {
-		_, err = p.Output.Write([]byte("\n"))
+	if err == nil && len(options.JSONSuffix) > 0 {
+		_, err = p.Output.Write([]byte(options.JSONSuffix))
 	}
 	return err
 }
 
-func (p *Printer) jsonVal(v any, indent string, shorthandPayloads bool) ([]byte, error) {
+func (p *Printer) jsonVal(v any, prefix string, indent string, shorthandPayloads bool) ([]byte, error) {
 	// Use proto JSON if a proto message
 	if protoMessage, ok := v.(proto.Message); ok {
 		opts := temporalproto.CustomJSONMarshalOptions{Indent: indent}
@@ -198,7 +200,7 @@ func (p *Printer) jsonVal(v any, indent string, shorthandPayloads bool) ([]byte,
 
 	// Normal JSON encoding
 	if indent != "" {
-		return json.MarshalIndent(v, "", indent)
+		return json.MarshalIndent(v, prefix, indent)
 	}
 	return json.Marshal(v)
 }
@@ -354,7 +356,7 @@ func (p *Printer) textVal(v any) string {
 		}
 		return p.FormatTime(ref.Interface().(time.Time))
 	} else if ref.IsValid() && ((ref.Kind() == reflect.Struct && ref.CanInterface()) || ref.Type().Implements(jsonMarshalerType)) {
-		b, err := p.jsonVal(v, "", true)
+		b, err := p.jsonVal(v, "", "", true)
 		if err != nil {
 			return fmt.Sprintf("<failed converting to string: %v>", err)
 		}

@@ -199,6 +199,7 @@ func (c *TemporalWorkflowListCommand) run(cctx *CommandContext, args []string) e
 	pageFetcher := c.pageFetcher(cctx, cl)
 	var nextPageToken []byte
 	var execsProcessed int
+	var jsonPrefix string
 	for pageIndex := 0; ; pageIndex++ {
 		page, err := pageFetcher(nextPageToken)
 		if err != nil {
@@ -209,10 +210,16 @@ func (c *TemporalWorkflowListCommand) run(cctx *CommandContext, args []string) e
 			if c.Limit > 0 && execsProcessed >= c.Limit {
 				break
 			}
-			execsProcessed++
-			// For JSON we are going to dump one line of JSON per execution
 			if cctx.JSONOutput {
-				_ = cctx.Printer.PrintStructured(exec, printer.StructuredOptions{})
+				if execsProcessed == 0 {
+					jsonPrefix = "[\n"
+				} else {
+					jsonPrefix = ",\n"
+				}
+				_ = cctx.Printer.PrintStructured(exec, printer.StructuredOptions{
+					JSONPrefix: jsonPrefix + cctx.Printer.JSONIndent,
+					JSONSuffix: "",
+				})
 			} else {
 				// For non-JSON, we are doing a table for each page
 				textTable = append(textTable, map[string]any{
@@ -222,6 +229,7 @@ func (c *TemporalWorkflowListCommand) run(cctx *CommandContext, args []string) e
 					"StartTime":  exec.StartTime.AsTime(),
 				})
 			}
+			execsProcessed++
 		}
 		// Print table, headers only on first table
 		if len(textTable) > 0 {
@@ -233,6 +241,9 @@ func (c *TemporalWorkflowListCommand) run(cctx *CommandContext, args []string) e
 		// Stop if next page token non-existing or executions reached limit
 		nextPageToken = page.GetNextPageToken()
 		if len(nextPageToken) == 0 || (c.Limit > 0 && execsProcessed >= c.Limit) {
+			if cctx.JSONOutput && execsProcessed > 0 {
+				cctx.Printer.Output.Write([]byte("\n]\n"))
+			}
 			return nil
 		}
 	}
