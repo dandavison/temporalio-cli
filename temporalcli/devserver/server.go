@@ -202,7 +202,6 @@ func (s *StartOptions) buildServerOptions() ([]temporal.ServerOption, error) {
 
 	// Setting host level mutable state cache size to 8k.
 	dynConf := make(dynamicconfig.StaticClient, len(s.DynamicConfigValues)+1)
-	dynConf[dynamicconfig.HistoryCacheHostLevelMaxSize] = 8096
 
 	// Dynamic config if set
 	for k, v := range s.DynamicConfigValues {
