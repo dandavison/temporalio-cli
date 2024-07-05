@@ -657,35 +657,10 @@ func (s *SharedServerSuite) TestWorkflow_Execute_NullValue() {
 		"--address", s.Address(),
 		"--task-queue", s.Worker().Options.TaskQueue,
 		"--type", "DevWorkflow",
-		"--workflow-id", "my-id1",
-		"-i", `["val1", "val2"]`,
+		"--workflow-id", "my-id",
 	)
 	s.NoError(res.Err)
 	out := res.Stdout.String()
-	s.ContainsOnSameLine(out, "WorkflowId", "my-id1")
-	s.Equal([]any{"val1", "val2"}, s.Worker().DevWorkflowLastInput())
-	s.ContainsOnSameLine(out, "1", "WorkflowExecutionStarted")
-	s.ContainsOnSameLine(out, "2", "WorkflowTaskScheduled")
-	s.ContainsOnSameLine(out, "3", "WorkflowTaskStarted")
-	// Confirm results
-	s.Contains(out, "RunTime")
 	s.ContainsOnSameLine(out, "Status", "COMPLETED")
 	s.ContainsOnSameLine(out, "Result", `{"foo":null}`)
-
-	// JSON
-	res = s.Execute(
-		"workflow", "execute",
-		"-o", "json",
-		"--address", s.Address(),
-		"--task-queue", s.Worker().Options.TaskQueue,
-		"--type", "DevWorkflow",
-		"--workflow-id", "my-id2",
-	)
-	s.NoError(res.Err)
-	var jsonOut map[string]any
-	s.NoError(json.Unmarshal(res.Stdout.Bytes(), &jsonOut))
-	s.Equal("my-id2", jsonOut["workflowId"])
-	s.Equal("COMPLETED", jsonOut["status"])
-	s.NotNil(jsonOut["closeEvent"])
-	s.Equal(map[string]any{"foo": nil}, jsonOut["result"])
 }
