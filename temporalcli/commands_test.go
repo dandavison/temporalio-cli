@@ -183,6 +183,7 @@ func (s *SharedServerSuite) SetupSuite() {
 			// Enable for operator cluster commands
 			EnableGlobalNamespace: true,
 			DynamicConfigValues: map[string]any{
+				"frontend.enableUpdateWorkflowExecutionAsyncAccepted": true,
 				// Allow a high rate of change to namespaces, particularly
 				// for the task-queue command tests.
 				"frontend.namespaceRPS.visibility": 10000,
@@ -219,10 +220,6 @@ func (s *SharedServerSuite) SetupTest() {
 }
 
 func (s *SharedServerSuite) TearDownTest() {
-	// If there is log output, log it
-	if b := s.LogOutput(); len(b) > 0 {
-		s.t.Logf("Server/SDK Log Output:\n-----\n%s-----", b)
-	}
 	if s.CommandHarness != nil {
 		s.CommandHarness.Close()
 	}
