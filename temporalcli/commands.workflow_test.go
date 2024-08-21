@@ -369,9 +369,25 @@ func (s *SharedServerSuite) TestWorkflow_Cancel_SingleWorkflowSuccess() {
 }
 
 func (s *SharedServerSuite) TestWorkflow_Update() {
+	workflowUpdateTest{
+		s:             s,
+		useSubcommand: true,
+	}.testWorkflowUpdateHelper()
+	// workflowUpdateTest{
+	// 	s:             s,
+	// 	useSubcommand: false,
+	// }.testWorkflowUpdateHelper()
+}
+
+type workflowUpdateTest struct {
+	s             *SharedServerSuite
+	useSubcommand bool
+}
+
+func (t workflowUpdateTest) testWorkflowUpdateHelper() {
 	updateName := "test-update"
 
-	s.Worker().OnDevWorkflow(func(ctx workflow.Context, val any) (any, error) {
+	t.s.Worker().OnDevWorkflow(func(ctx workflow.Context, val any) (any, error) {
 		// setup a simple workflow which receives non-negative floats in updates and adds them to a running counter
 		counter, ok := val.(float64)
 		if !ok {
@@ -407,51 +423,68 @@ func (s *SharedServerSuite) TestWorkflow_Update() {
 
 	// Start the workflow
 	input := rand.Intn(100)
-	run, err := s.Client.ExecuteWorkflow(
-		s.Context,
-		client.StartWorkflowOptions{TaskQueue: s.Worker().Options.TaskQueue},
+	run, err := t.s.Client.ExecuteWorkflow(
+		t.s.Context,
+		client.StartWorkflowOptions{TaskQueue: t.s.Worker().Options.TaskQueue},
 		DevWorkflow,
 		input,
 	)
-	s.NoError(err)
+	t.s.NoError(err)
 
 	// Stop the workflow when the test is complete
 	defer func() {
-		err := s.Client.SignalWorkflow(s.Context, run.GetID(), run.GetRunID(), "updates-done", nil)
-		s.NoError(err)
+		err := t.s.Client.SignalWorkflow(t.s.Context, run.GetID(), run.GetRunID(), "updates-done", nil)
+		t.s.NoError(err)
 	}()
 
 	// successful update, should show the result
-	res := s.Execute("workflow", "update", "--address", s.Address(), "-w", run.GetID(),
+	res := t.execute("workflow", "update", "execute", "--address", t.s.Address(), "-w", run.GetID(),
 		"--name", updateName, "-i", strconv.Itoa(input))
-	s.NoError(res.Err)
-	s.Contains(res.Stdout.String(), strconv.Itoa(input))
+	t.s.NoError(res.Err)
+	t.s.Contains(res.Stdout.String(), strconv.Itoa(input))
 
 	// successful update passing first-execution-run-id
-	res = s.Execute("workflow", "update", "--address", s.Address(), "-w", run.GetID(),
+	res = t.execute("workflow", "update", "execute", "--address", t.s.Address(), "-w", run.GetID(),
 		// Use --type here to make sure the alias works
 		"--type", updateName, "-i", strconv.Itoa(input), "--first-execution-run-id", run.GetRunID())
-	s.NoError(res.Err)
+	t.s.NoError(res.Err)
 
 	// successful update passing update-id
-	res = s.Execute("workflow", "update", "--address", s.Address(), "--update-id", strconv.Itoa(input), "-w", run.GetID(), "--name", updateName, "-i", strconv.Itoa(input))
-	s.NoError(res.Err)
-	s.Contains(res.Stdout.String(), strconv.Itoa(input))
-	res = s.Execute("workflow", "update", "--address", s.Address(), "--update-id", strconv.Itoa(input), "-w", run.GetID(), "--name", updateName)
-	s.NoError(res.Err)
-	s.Contains(res.Stdout.String(), strconv.Itoa(input))
+	res = t.execute("workflow", "update", "execute", "--address", t.s.Address(), "--update-id", strconv.Itoa(input), "-w", run.GetID(), "--name", updateName, "-i", strconv.Itoa(input))
+	t.s.NoError(res.Err)
+	t.s.Contains(res.Stdout.String(), strconv.Itoa(input))
+	res = t.execute("workflow", "update", "execute", "--address", t.s.Address(), "--update-id", strconv.Itoa(input), "-w", run.GetID(), "--name", updateName)
+	t.s.NoError(res.Err)
+	t.s.Contains(res.Stdout.String(), strconv.Itoa(input))
 
 	// update rejected, when name is not available
-	res = s.Execute("workflow", "update", "--address", s.Address(), "-w", run.GetID(), "-i", strconv.Itoa(input))
-	s.ErrorContains(res.Err, "required flag(s) \"name\" not set")
+	res = t.execute("workflow", "update", "execute", "--address", t.s.Address(), "-w", run.GetID(), "-i", strconv.Itoa(input))
+	t.s.ErrorContains(res.Err, "required flag(s) \"name\" not set")
 
 	// update rejected, wrong workflowID
-	res = s.Execute("workflow", "update", "--address", s.Address(), "-w", "nonexistent-wf-id", "--name", updateName, "-i", strconv.Itoa(input))
-	s.ErrorContains(res.Err, "unable to update workflow")
+	res = t.execute("workflow", "update", "execute", "--address", t.s.Address(), "-w", "nonexistent-wf-id", "--name", updateName, "-i", strconv.Itoa(input))
+	t.s.ErrorContains(res.Err, "unable to update workflow")
 
 	// update rejected, wrong update name
-	res = s.Execute("workflow", "update", "--address", s.Address(), "-w", run.GetID(), "--name", "nonexistent-update-name", "-i", strconv.Itoa(input))
-	s.ErrorContains(res.Err, "unable to update workflow")
+	res = t.execute("workflow", "update", "execute", "--address", t.s.Address(), "-w", run.GetID(), "--name", "nonexistent-update-name", "-i", strconv.Itoa(input))
+	t.s.ErrorContains(res.Err, "unable to update workflow")
+}
+
+func (t workflowUpdateTest) execute(args ...string) *CommandResult {
+	if !(len(args) >= 2 && args[0] == "workflow" && args[1] == "update") {
+		panic("First two arguments must be 'workflow' and 'update'")
+	}
+	if t.useSubcommand {
+		if !(len(args) >= 3 && (args[2] == "execute" || args[2] == "start")) {
+			panic("When useSubcommand is true, the third argument must be 'execute' or 'start'")
+		}
+	} else {
+		if !(len(args) >= 3 && args[2] == "execute") {
+			panic("When useSubcommand is false, the third argument must be 'execute'")
+		}
+		args = append(args[:2], args[3:]...)
+	}
+	return t.s.Execute(args...)
 }
 
 func (s *SharedServerSuite) TestWorkflow_Cancel_BatchWorkflowSuccess() {
