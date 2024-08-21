@@ -230,6 +230,49 @@ func (c *TemporalWorkflowUpdateCommand) run(cctx *CommandContext, args []string)
 		printer.StructuredOptions{})
 }
 
+func (c *TemporalWorkflowUpdateExecuteCommand) run(cctx *CommandContext, args []string) error {
+	cl, err := c.Parent.Parent.ClientOptions.dialClient(cctx)
+	if err != nil {
+		return err
+	}
+	defer cl.Close()
+
+	// Get raw input
+	input, err := c.buildRawInput()
+	if err != nil {
+		return err
+	}
+
+	request := client.UpdateWorkflowOptions{
+		WorkflowID:          c.WorkflowId,
+		RunID:               c.RunId,
+		UpdateName:          c.Name,
+		UpdateID:            c.UpdateId,
+		FirstExecutionRunID: c.FirstExecutionRunId,
+		Args:                input,
+		WaitForStage:        client.WorkflowUpdateStageCompleted,
+	}
+
+	updateHandle, err := cl.UpdateWorkflow(cctx, request)
+	if err != nil {
+		return fmt.Errorf("unable to update workflow: %w", err)
+	}
+
+	var valuePtr interface{}
+	err = updateHandle.Get(cctx, &valuePtr)
+	if err != nil {
+		return fmt.Errorf("unable to update workflow: %w", err)
+	}
+
+	return cctx.Printer.PrintStructured(
+		struct {
+			Name     string      `json:"name"`
+			UpdateID string      `json:"updateId"`
+			Result   interface{} `json:"result"`
+		}{Name: c.Name, UpdateID: updateHandle.UpdateID(), Result: valuePtr},
+		printer.StructuredOptions{})
+}
+
 func username() string {
 	username := "<unknown-user>"
 	if u, err := user.Current(); err != nil && u.Username != "" {

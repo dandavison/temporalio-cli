@@ -2555,3 +2555,38 @@ temporal workflow update \
   with this Run ID.
 
 Includes options set for [payload input](#options-set-for-payload-input).
+
+### temporal workflow update execute: Synchronously run a Workflow update handler
+
+Send a message to a Workflow Execution to invoke an update handler. An update
+can change the state of a Workflow Execution and return a response:
+
+```
+temporal workflow update \
+    --workflow-id YourWorkflowId \
+    --name YourUpdate \
+    --input '{"Input": "As-JSON"}'
+```
+
+#### Options
+
+* `--name` (string) -
+  Handler method name.
+  Required.
+  Alias: `--type`.
+* `--workflow-id`, `-w` (string) -
+  Workflow ID.
+  Required.
+* `--update-id` (string) -
+  Update ID.
+  If unset, defaults to a UUID.
+  Must be unique per Workflow Execution.
+* `--run-id`, `-r` (string) -
+  Run ID.
+  If unset, updates the currently-running Workflow Execution.
+* `--first-execution-run-id` (string) -
+  Parent Run ID.
+  The update is sent to the last Workflow Execution in the chain started
+  with this Run ID.
+
+Includes options set for [payload input](#options-set-for-payload-input).

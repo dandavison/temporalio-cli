@@ -2609,8 +2609,45 @@ type TemporalWorkflowUpdateCommand struct {
 func NewTemporalWorkflowUpdateCommand(cctx *CommandContext, parent *TemporalWorkflowCommand) *TemporalWorkflowUpdateCommand {
 	var s TemporalWorkflowUpdateCommand
 	s.Parent = parent
+	s.Command.Use = "update"
+	s.Command.Short = "Synchronously run a Workflow update handler"
+	if hasHighlighting {
+		s.Command.Long = "Send a message to a Workflow Execution to invoke an update handler. An update\ncan change the state of a Workflow Execution and return a response:\n\n\x1b[1mtemporal workflow update \\\n    --workflow-id YourWorkflowId \\\n    --name YourUpdate \\\n    --input '{\"Input\": \"As-JSON\"}'\x1b[0m"
+	} else {
+		s.Command.Long = "Send a message to a Workflow Execution to invoke an update handler. An update\ncan change the state of a Workflow Execution and return a response:\n\n```\ntemporal workflow update \\\n    --workflow-id YourWorkflowId \\\n    --name YourUpdate \\\n    --input '{\"Input\": \"As-JSON\"}'\n```"
+	}
+	s.Command.Args = cobra.NoArgs
+	s.Command.AddCommand(&NewTemporalWorkflowUpdateExecuteCommand(cctx, &s).Command)
+	s.PayloadInputOptions.buildFlags(cctx, s.Command.PersistentFlags())
+	s.Command.PersistentFlags().StringVar(&s.Name, "name", "", "Handler method name. Required. Aliased as \"--type\".")
+	_ = cobra.MarkFlagRequired(s.Command.PersistentFlags(), "name")
+	s.Command.PersistentFlags().StringVarP(&s.WorkflowId, "workflow-id", "w", "", "Workflow ID. Required.")
+	_ = cobra.MarkFlagRequired(s.Command.PersistentFlags(), "workflow-id")
+	s.Command.PersistentFlags().StringVar(&s.UpdateId, "update-id", "", "Update ID. If unset, defaults to a UUID. Must be unique per Workflow Execution.")
+	s.Command.PersistentFlags().StringVarP(&s.RunId, "run-id", "r", "", "Run ID. If unset, updates the currently-running Workflow Execution.")
+	s.Command.PersistentFlags().StringVar(&s.FirstExecutionRunId, "first-execution-run-id", "", "Parent Run ID. The update is sent to the last Workflow Execution in the chain started with this Run ID.")
+	s.Command.PersistentFlags().SetNormalizeFunc(aliasNormalizer(map[string]string{
+		"type": "name",
+	}))
+	return &s
+}
+
+type TemporalWorkflowUpdateExecuteCommand struct {
+	Parent  *TemporalWorkflowUpdateCommand
+	Command cobra.Command
+	PayloadInputOptions
+	Name                string
+	WorkflowId          string
+	UpdateId            string
+	RunId               string
+	FirstExecutionRunId string
+}
+
+func NewTemporalWorkflowUpdateExecuteCommand(cctx *CommandContext, parent *TemporalWorkflowUpdateCommand) *TemporalWorkflowUpdateExecuteCommand {
+	var s TemporalWorkflowUpdateExecuteCommand
+	s.Parent = parent
 	s.Command.DisableFlagsInUseLine = true
-	s.Command.Use = "update [flags]"
+	s.Command.Use = "execute [flags]"
 	s.Command.Short = "Synchronously run a Workflow update handler"
 	if hasHighlighting {
 		s.Command.Long = "Send a message to a Workflow Execution to invoke an update handler. An update\ncan change the state of a Workflow Execution and return a response:\n\n\x1b[1mtemporal workflow update \\\n    --workflow-id YourWorkflowId \\\n    --name YourUpdate \\\n    --input '{\"Input\": \"As-JSON\"}'\x1b[0m"
