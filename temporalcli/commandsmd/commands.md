@@ -2122,7 +2122,7 @@ temporal workflow execute
     --workflow-id YourWorkflowId \
     --type YourWorkflow \
     --task-queue YourTaskQueue \
-    --input '{"Input": "As-JSON"}'
+    --input '{"some-key": "some-value"}'
 ```
 
 Use `--event-details` to relay updates to the command-line output in JSON
@@ -2373,7 +2373,7 @@ temporal workflow start \
 		--workflow-id YourWorkflowId \
 		--type YourWorkflow \
 		--task-queue YourTaskQueue \
-		--input '{"Input": "As-JSON"}'
+		--input '{"some-key": "some-value"}'
 ```
 
 #### Options set for shared workflow start:
@@ -2521,17 +2521,9 @@ temporal workflow trace \
 
 Includes options set for [workflow reference](#options-set-for-workflow-reference).
 
-### temporal workflow update: Synchronously run a Workflow update handler
+### temporal workflow update: Send an Update and wait for it to complete
 
-Send a message to a Workflow Execution to invoke an update handler. An update
-can change the state of a Workflow Execution and return a response:
-
-```
-temporal workflow update \
-    --workflow-id YourWorkflowId \
-    --name YourUpdate \
-    --input '{"Input": "As-JSON"}'
-```
+Synonym of `temporal workflow update execute`.
 
 #### Options
 
@@ -2556,16 +2548,17 @@ temporal workflow update \
 
 Includes options set for [payload input](#options-set-for-payload-input).
 
-### temporal workflow update execute: Synchronously run a Workflow update handler
+### temporal workflow update execute: Send an Update and wait for it to complete
 
-Send a message to a Workflow Execution to invoke an update handler. An update
-can change the state of a Workflow Execution and return a response:
+Send a message to a Workflow Execution to invoke an Update handler, and wait for
+the Update to complete. An Update can change the state of a Workflow Execution
+and return a response:
 
 ```
-temporal workflow update \
+temporal workflow update execute \
     --workflow-id YourWorkflowId \
     --name YourUpdate \
-    --input '{"Input": "As-JSON"}'
+    --input '{"some-key": "some-value"}'
 ```
 
 #### Options
