@@ -188,74 +188,55 @@ func (c *TemporalWorkflowTerminateCommand) run(cctx *CommandContext, _ []string)
 }
 
 func (c *TemporalWorkflowUpdateCommand) run(cctx *CommandContext, args []string) error {
-	cl, err := c.Parent.ClientOptions.dialClient(cctx)
-	if err != nil {
-		return err
-	}
-	defer cl.Close()
-
-	// Get raw input
-	input, err := c.buildRawInput()
-	if err != nil {
-		return err
-	}
-
-	request := client.UpdateWorkflowOptions{
-		WorkflowID:          c.WorkflowId,
-		RunID:               c.RunId,
-		UpdateName:          c.Name,
-		UpdateID:            c.UpdateId,
-		FirstExecutionRunID: c.FirstExecutionRunId,
-		Args:                input,
-		WaitForStage:        client.WorkflowUpdateStageCompleted,
-	}
-
-	updateHandle, err := cl.UpdateWorkflow(cctx, request)
-	if err != nil {
-		return fmt.Errorf("unable to update workflow: %w", err)
-	}
-
-	var valuePtr interface{}
-	err = updateHandle.Get(cctx, &valuePtr)
-	if err != nil {
-		return fmt.Errorf("unable to update workflow: %w", err)
-	}
-
-	return cctx.Printer.PrintStructured(
-		struct {
-			Name     string      `json:"name"`
-			UpdateID string      `json:"updateId"`
-			Result   interface{} `json:"result"`
-		}{Name: c.Name, UpdateID: updateHandle.UpdateID(), Result: valuePtr},
-		printer.StructuredOptions{})
+	return workflowUpdateHelper(cctx, c.Parent, c.PayloadInputOptions, c.UpdateOptions, client.WorkflowUpdateStageCompleted)
 }
 
 func (c *TemporalWorkflowUpdateExecuteCommand) run(cctx *CommandContext, args []string) error {
-	cl, err := c.Parent.Parent.ClientOptions.dialClient(cctx)
+	return workflowUpdateHelper(cctx, c.Parent.Parent, c.Parent.PayloadInputOptions, c.UpdateOptions, client.WorkflowUpdateStageCompleted)
+}
+
+func (c *TemporalWorkflowUpdateStartCommand) run(cctx *CommandContext, args []string) error {
+	return workflowUpdateHelper(cctx, c.Parent.Parent, c.Parent.PayloadInputOptions, c.UpdateOptions, client.WorkflowUpdateStageAccepted)
+}
+
+func workflowUpdateHelper(cctx *CommandContext,
+	parent *TemporalWorkflowCommand,
+	inputOpts PayloadInputOptions,
+	updateOpts UpdateOptions,
+	waitForStage client.WorkflowUpdateStage,
+) error {
+	cl, err := parent.ClientOptions.dialClient(cctx)
 	if err != nil {
 		return err
 	}
 	defer cl.Close()
 
-	// Get raw input
-	input, err := c.buildRawInput()
+	input, err := inputOpts.buildRawInput()
 	if err != nil {
 		return err
 	}
 
 	request := client.UpdateWorkflowOptions{
-		WorkflowID:          c.WorkflowId,
-		RunID:               c.RunId,
-		UpdateName:          c.Name,
-		UpdateID:            c.UpdateId,
-		FirstExecutionRunID: c.FirstExecutionRunId,
+		WorkflowID:          updateOpts.WorkflowId,
+		RunID:               updateOpts.RunId,
+		UpdateName:          updateOpts.Name,
+		UpdateID:            updateOpts.UpdateId,
+		FirstExecutionRunID: updateOpts.FirstExecutionRunId,
 		Args:                input,
-		WaitForStage:        client.WorkflowUpdateStageCompleted,
+		WaitForStage:        waitForStage,
 	}
 
 	updateHandle, err := cl.UpdateWorkflow(cctx, request)
 	if err != nil {
 		return fmt.Errorf("unable to update workflow: %w", err)
+	}
+	if waitForStage == client.WorkflowUpdateStageAccepted {
+		return cctx.Printer.PrintStructured(
+			struct {
+				Name     string `json:"name"`
+				UpdateID string `json:"updateId"`
+			}{Name: updateOpts.Name, UpdateID: updateHandle.UpdateID()},
+			printer.StructuredOptions{})
 	}
 
 	var valuePtr interface{}
@@ -269,7 +250,7 @@ func (c *TemporalWorkflowUpdateExecuteCommand) run(cctx *CommandContext, args []
 			Name     string      `json:"name"`
 			UpdateID string      `json:"updateId"`
 			Result   interface{} `json:"result"`
-		}{Name: c.Name, UpdateID: updateHandle.UpdateID(), Result: valuePtr},
+		}{Name: updateOpts.Name, UpdateID: updateHandle.UpdateID(), Result: valuePtr},
 		printer.StructuredOptions{})
 }
 
