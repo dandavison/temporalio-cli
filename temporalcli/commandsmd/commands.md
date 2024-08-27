@@ -2590,3 +2590,39 @@ temporal workflow update \
   with this Run ID.
 
 Includes options set for [payload input](#options-set-for-payload-input).
+
+### temporal workflow update start: Send an Update and wait for it to be accepted
+
+Send a message to a Workflow Execution to invoke an Update handler, and wait for
+the update to be accepted or rejected. An update can change the state of a
+Workflow Execution and return a response:
+
+```
+temporal workflow update start \
+    --workflow-id YourWorkflowId \
+    --name YourUpdate \
+    --input '{"some-key": "some-value"}'
+```
+
+#### Options set for update start
+
+* `--name` (string) -
+  Handler method name.
+  Required.
+  Alias: `--type`.
+* `--workflow-id`, `-w` (string) -
+  Workflow ID.
+  Required.
+* `--update-id` (string) -
+  Update ID.
+  If unset, defaults to a UUID.
+  Must be unique per Workflow Execution.
+* `--run-id`, `-r` (string) -
+  Run ID.
+  If unset, updates the currently-running Workflow Execution.
+* `--first-execution-run-id` (string) -
+  Parent Run ID.
+  The update is sent to the last Workflow Execution in the chain started
+  with this Run ID.
+
+Includes options set for [payload input](#options-set-for-payload-input).
