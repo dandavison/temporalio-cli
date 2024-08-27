@@ -2156,9 +2156,9 @@ func NewTemporalWorkflowExecuteCommand(cctx *CommandContext, parent *TemporalWor
 	s.Command.Use = "execute [flags]"
 	s.Command.Short = "Start new Workflow Execution"
 	if hasHighlighting {
-		s.Command.Long = "Establish a new Workflow Execution and direct its progress to stdout. The\ncommand blocks and returns when the Workflow Execution completes. If your\nWorkflow requires input, pass valid JSON:\n\n\x1b[1mtemporal workflow execute\n    --workflow-id YourWorkflowId \\\n    --type YourWorkflow \\\n    --task-queue YourTaskQueue \\\n    --input '{\"Input\": \"As-JSON\"}'\x1b[0m\n\nUse \x1b[1m--event-details\x1b[0m to relay updates to the command-line output in JSON\nformat. When using JSON output (\x1b[1m--output json\x1b[0m), this includes the entire\n\"history\" JSON key for the run."
+		s.Command.Long = "Establish a new Workflow Execution and direct its progress to stdout. The\ncommand blocks and returns when the Workflow Execution completes. If your\nWorkflow requires input, pass valid JSON:\n\n\x1b[1mtemporal workflow execute\n    --workflow-id YourWorkflowId \\\n    --type YourWorkflow \\\n    --task-queue YourTaskQueue \\\n    --input '{\"some-key\": \"some-value\"}'\x1b[0m\n\nUse \x1b[1m--event-details\x1b[0m to relay updates to the command-line output in JSON\nformat. When using JSON output (\x1b[1m--output json\x1b[0m), this includes the entire\n\"history\" JSON key for the run."
 	} else {
-		s.Command.Long = "Establish a new Workflow Execution and direct its progress to stdout. The\ncommand blocks and returns when the Workflow Execution completes. If your\nWorkflow requires input, pass valid JSON:\n\n```\ntemporal workflow execute\n    --workflow-id YourWorkflowId \\\n    --type YourWorkflow \\\n    --task-queue YourTaskQueue \\\n    --input '{\"Input\": \"As-JSON\"}'\n```\n\nUse `--event-details` to relay updates to the command-line output in JSON\nformat. When using JSON output (`--output json`), this includes the entire\n\"history\" JSON key for the run."
+		s.Command.Long = "Establish a new Workflow Execution and direct its progress to stdout. The\ncommand blocks and returns when the Workflow Execution completes. If your\nWorkflow requires input, pass valid JSON:\n\n```\ntemporal workflow execute\n    --workflow-id YourWorkflowId \\\n    --type YourWorkflow \\\n    --task-queue YourTaskQueue \\\n    --input '{\"some-key\": \"some-value\"}'\n```\n\nUse `--event-details` to relay updates to the command-line output in JSON\nformat. When using JSON output (`--output json`), this includes the entire\n\"history\" JSON key for the run."
 	}
 	s.Command.Args = cobra.NoArgs
 	s.SharedWorkflowStartOptions.buildFlags(cctx, s.Command.Flags())
@@ -2506,9 +2506,9 @@ func NewTemporalWorkflowStartCommand(cctx *CommandContext, parent *TemporalWorkf
 	s.Command.Use = "start [flags]"
 	s.Command.Short = "Initiate a Workflow Execution"
 	if hasHighlighting {
-		s.Command.Long = "Start a new Workflow Execution. Returns the Workflow- and Run-IDs.\n\n\x1b[1mtemporal workflow start \\\n\t\t--workflow-id YourWorkflowId \\\n\t\t--type YourWorkflow \\\n\t\t--task-queue YourTaskQueue \\\n\t\t--input '{\"Input\": \"As-JSON\"}'\x1b[0m"
+		s.Command.Long = "Start a new Workflow Execution. Returns the Workflow- and Run-IDs.\n\n\x1b[1mtemporal workflow start \\\n\t\t--workflow-id YourWorkflowId \\\n\t\t--type YourWorkflow \\\n\t\t--task-queue YourTaskQueue \\\n\t\t--input '{\"some-key\": \"some-value\"}'\x1b[0m"
 	} else {
-		s.Command.Long = "Start a new Workflow Execution. Returns the Workflow- and Run-IDs.\n\n```\ntemporal workflow start \\\n\t\t--workflow-id YourWorkflowId \\\n\t\t--type YourWorkflow \\\n\t\t--task-queue YourTaskQueue \\\n\t\t--input '{\"Input\": \"As-JSON\"}'\n```"
+		s.Command.Long = "Start a new Workflow Execution. Returns the Workflow- and Run-IDs.\n\n```\ntemporal workflow start \\\n\t\t--workflow-id YourWorkflowId \\\n\t\t--type YourWorkflow \\\n\t\t--task-queue YourTaskQueue \\\n\t\t--input '{\"some-key\": \"some-value\"}'\n```"
 	}
 	s.Command.Args = cobra.NoArgs
 	s.SharedWorkflowStartOptions.buildFlags(cctx, s.Command.Flags())
@@ -2610,14 +2610,15 @@ func NewTemporalWorkflowUpdateCommand(cctx *CommandContext, parent *TemporalWork
 	var s TemporalWorkflowUpdateCommand
 	s.Parent = parent
 	s.Command.Use = "update"
-	s.Command.Short = "Synchronously run a Workflow update handler"
+	s.Command.Short = "Send an Update and wait for it to complete"
 	if hasHighlighting {
-		s.Command.Long = "Send a message to a Workflow Execution to invoke an update handler. An update\ncan change the state of a Workflow Execution and return a response:\n\n\x1b[1mtemporal workflow update \\\n    --workflow-id YourWorkflowId \\\n    --name YourUpdate \\\n    --input '{\"Input\": \"As-JSON\"}'\x1b[0m"
+		s.Command.Long = "Synonym of \x1b[1mtemporal workflow update execute\x1b[0m."
 	} else {
-		s.Command.Long = "Send a message to a Workflow Execution to invoke an update handler. An update\ncan change the state of a Workflow Execution and return a response:\n\n```\ntemporal workflow update \\\n    --workflow-id YourWorkflowId \\\n    --name YourUpdate \\\n    --input '{\"Input\": \"As-JSON\"}'\n```"
+		s.Command.Long = "Synonym of `temporal workflow update execute`."
 	}
 	s.Command.Args = cobra.NoArgs
 	s.Command.AddCommand(&NewTemporalWorkflowUpdateExecuteCommand(cctx, &s).Command)
+	s.Command.AddCommand(&NewTemporalWorkflowUpdateStartCommand(cctx, &s).Command)
 	s.PayloadInputOptions.buildFlags(cctx, s.Command.PersistentFlags())
 	s.Command.PersistentFlags().StringVar(&s.Name, "name", "", "Handler method name. Required. Aliased as \"--type\".")
 	_ = cobra.MarkFlagRequired(s.Command.PersistentFlags(), "name")
@@ -2648,11 +2649,53 @@ func NewTemporalWorkflowUpdateExecuteCommand(cctx *CommandContext, parent *Tempo
 	s.Parent = parent
 	s.Command.DisableFlagsInUseLine = true
 	s.Command.Use = "execute [flags]"
-	s.Command.Short = "Synchronously run a Workflow update handler"
+	s.Command.Short = "Send an Update and wait for it to complete"
 	if hasHighlighting {
-		s.Command.Long = "Send a message to a Workflow Execution to invoke an update handler. An update\ncan change the state of a Workflow Execution and return a response:\n\n\x1b[1mtemporal workflow update \\\n    --workflow-id YourWorkflowId \\\n    --name YourUpdate \\\n    --input '{\"Input\": \"As-JSON\"}'\x1b[0m"
+		s.Command.Long = "Send a message to a Workflow Execution to invoke an Update handler, and wait for\nthe Update to complete. An Update can change the state of a Workflow Execution\nand return a response:\n\n\x1b[1mtemporal workflow update execute \\\n    --workflow-id YourWorkflowId \\\n    --name YourUpdate \\\n    --input '{\"some-key\": \"some-value\"}'\x1b[0m"
 	} else {
-		s.Command.Long = "Send a message to a Workflow Execution to invoke an update handler. An update\ncan change the state of a Workflow Execution and return a response:\n\n```\ntemporal workflow update \\\n    --workflow-id YourWorkflowId \\\n    --name YourUpdate \\\n    --input '{\"Input\": \"As-JSON\"}'\n```"
+		s.Command.Long = "Send a message to a Workflow Execution to invoke an Update handler, and wait for\nthe Update to complete. An Update can change the state of a Workflow Execution\nand return a response:\n\n```\ntemporal workflow update execute \\\n    --workflow-id YourWorkflowId \\\n    --name YourUpdate \\\n    --input '{\"some-key\": \"some-value\"}'\n```"
+	}
+	s.Command.Args = cobra.NoArgs
+	s.PayloadInputOptions.buildFlags(cctx, s.Command.Flags())
+	s.Command.Flags().StringVar(&s.Name, "name", "", "Handler method name. Required. Aliased as \"--type\".")
+	_ = cobra.MarkFlagRequired(s.Command.Flags(), "name")
+	s.Command.Flags().StringVarP(&s.WorkflowId, "workflow-id", "w", "", "Workflow ID. Required.")
+	_ = cobra.MarkFlagRequired(s.Command.Flags(), "workflow-id")
+	s.Command.Flags().StringVar(&s.UpdateId, "update-id", "", "Update ID. If unset, defaults to a UUID. Must be unique per Workflow Execution.")
+	s.Command.Flags().StringVarP(&s.RunId, "run-id", "r", "", "Run ID. If unset, updates the currently-running Workflow Execution.")
+	s.Command.Flags().StringVar(&s.FirstExecutionRunId, "first-execution-run-id", "", "Parent Run ID. The update is sent to the last Workflow Execution in the chain started with this Run ID.")
+	s.Command.Flags().SetNormalizeFunc(aliasNormalizer(map[string]string{
+		"type": "name",
+	}))
+	s.Command.Run = func(c *cobra.Command, args []string) {
+		if err := s.run(cctx, args); err != nil {
+			cctx.Options.Fail(err)
+		}
+	}
+	return &s
+}
+
+type TemporalWorkflowUpdateStartCommand struct {
+	Parent  *TemporalWorkflowUpdateCommand
+	Command cobra.Command
+	PayloadInputOptions
+	Name                string
+	WorkflowId          string
+	UpdateId            string
+	RunId               string
+	FirstExecutionRunId string
+}
+
+func NewTemporalWorkflowUpdateStartCommand(cctx *CommandContext, parent *TemporalWorkflowUpdateCommand) *TemporalWorkflowUpdateStartCommand {
+	var s TemporalWorkflowUpdateStartCommand
+	s.Parent = parent
+	s.Command.DisableFlagsInUseLine = true
+	s.Command.Use = "start [flags]"
+	s.Command.Short = "Send an Update and wait for it to be accepted"
+	if hasHighlighting {
+		s.Command.Long = "Send a message to a Workflow Execution to invoke an Update handler, and wait for\nthe update to be accepted or rejected. An update can change the state of a\nWorkflow Execution and return a response:\n\n\x1b[1mtemporal workflow update start \\\n    --workflow-id YourWorkflowId \\\n    --name YourUpdate \\\n    --input '{\"some-key\": \"some-value\"}'\x1b[0m"
+	} else {
+		s.Command.Long = "Send a message to a Workflow Execution to invoke an Update handler, and wait for\nthe update to be accepted or rejected. An update can change the state of a\nWorkflow Execution and return a response:\n\n```\ntemporal workflow update start \\\n    --workflow-id YourWorkflowId \\\n    --name YourUpdate \\\n    --input '{\"some-key\": \"some-value\"}'\n```"
 	}
 	s.Command.Args = cobra.NoArgs
 	s.PayloadInputOptions.buildFlags(cctx, s.Command.Flags())
