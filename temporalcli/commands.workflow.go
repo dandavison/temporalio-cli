@@ -94,7 +94,6 @@ func (c *TemporalWorkflowSignalCommand) run(cctx *CommandContext, args []string)
 	}
 	defer cl.Close()
 
-	// Get input payloads
 	input, err := c.buildRawInputPayloads()
 	if err != nil {
 		return err
@@ -354,7 +353,6 @@ func queryHelper(cctx *CommandContext,
 	}
 	defer cl.Close()
 
-	// Get input payloads
 	input, err := inputOpts.buildRawInputPayloads()
 	if err != nil {
 		return err

@@ -2546,6 +2546,7 @@ Synonym of `temporal workflow update execute`.
   The update is sent to the last Workflow Execution in the chain started
   with this Run ID.
 
+#### Options
 Includes options set for [payload input](#options-set-for-payload-input).
 
 ### temporal workflow update execute: Send an Update and wait for it to complete
@@ -2563,25 +2564,7 @@ temporal workflow update execute \
 
 #### Options
 
-* `--name` (string) -
-  Handler method name.
-  Required.
-  Alias: `--type`.
-* `--workflow-id`, `-w` (string) -
-  Workflow ID.
-  Required.
-* `--update-id` (string) -
-  Update ID.
-  If unset, defaults to a UUID.
-  Must be unique per Workflow Execution.
-* `--run-id`, `-r` (string) -
-  Run ID.
-  If unset, updates the currently-running Workflow Execution.
-* `--first-execution-run-id` (string) -
-  Parent Run ID.
-  The update is sent to the last Workflow Execution in the chain started
-  with this Run ID.
-
+Includes options set for [update](#options-set-for-update).
 Includes options set for [payload input](#options-set-for-payload-input).
 
 ### temporal workflow update start: Send an Update and wait for it to be accepted
@@ -2599,23 +2582,5 @@ temporal workflow update start \
 
 #### Options
 
-* `--name` (string) -
-  Handler method name.
-  Required.
-  Alias: `--type`.
-* `--workflow-id`, `-w` (string) -
-  Workflow ID.
-  Required.
-* `--update-id` (string) -
-  Update ID.
-  If unset, defaults to a UUID.
-  Must be unique per Workflow Execution.
-* `--run-id`, `-r` (string) -
-  Run ID.
-  If unset, updates the currently-running Workflow Execution.
-* `--first-execution-run-id` (string) -
-  Parent Run ID.
-  The update is sent to the last Workflow Execution in the chain started
-  with this Run ID.
-
+Includes options set for [update](#options-set-for-update).
 Includes options set for [payload input](#options-set-for-payload-input).
