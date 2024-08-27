@@ -2595,15 +2595,30 @@ func NewTemporalWorkflowTraceCommand(cctx *CommandContext, parent *TemporalWorkf
 	return &s
 }
 
-type TemporalWorkflowUpdateCommand struct {
-	Parent  *TemporalWorkflowCommand
-	Command cobra.Command
-	PayloadInputOptions
+type UpdateOptions struct {
 	Name                string
 	WorkflowId          string
 	UpdateId            string
 	RunId               string
 	FirstExecutionRunId string
+}
+
+func (v *UpdateOptions) buildFlags(cctx *CommandContext, f *pflag.FlagSet) {
+	v.PayloadInputOptions.buildFlags(cctx, f)
+	f.StringVar(&v.Name, "name", "", "Handler method name. Required. Aliased as \"--type\".")
+	_ = cobra.MarkFlagRequired(f, "name")
+	f.StringVarP(&v.WorkflowId, "workflow-id", "w", "", "Workflow ID. Required.")
+	_ = cobra.MarkFlagRequired(f, "workflow-id")
+	f.StringVar(&v.UpdateId, "update-id", "", "Update ID. If unset, defaults to a UUID. Must be unique per Workflow Execution.")
+	f.StringVarP(&v.RunId, "run-id", "r", "", "Run ID. If unset, updates the currently-running Workflow Execution.")
+	f.StringVar(&v.FirstExecutionRunId, "first-execution-run-id", "", "Parent Run ID. The update is sent to the last Workflow Execution in the chain started with this Run ID.")
+}
+
+type TemporalWorkflowUpdateCommand struct {
+	Parent  *TemporalWorkflowCommand
+	Command cobra.Command
+	PayloadInputOptions
+	UpdateOptions
 }
 
 func NewTemporalWorkflowUpdateCommand(cctx *CommandContext, parent *TemporalWorkflowCommand) *TemporalWorkflowUpdateCommand {
@@ -2619,14 +2634,7 @@ func NewTemporalWorkflowUpdateCommand(cctx *CommandContext, parent *TemporalWork
 	s.Command.Args = cobra.NoArgs
 	s.Command.AddCommand(&NewTemporalWorkflowUpdateExecuteCommand(cctx, &s).Command)
 	s.Command.AddCommand(&NewTemporalWorkflowUpdateStartCommand(cctx, &s).Command)
-	s.PayloadInputOptions.buildFlags(cctx, s.Command.PersistentFlags())
-	s.Command.PersistentFlags().StringVar(&s.Name, "name", "", "Handler method name. Required. Aliased as \"--type\".")
-	_ = cobra.MarkFlagRequired(s.Command.PersistentFlags(), "name")
-	s.Command.PersistentFlags().StringVarP(&s.WorkflowId, "workflow-id", "w", "", "Workflow ID. Required.")
-	_ = cobra.MarkFlagRequired(s.Command.PersistentFlags(), "workflow-id")
-	s.Command.PersistentFlags().StringVar(&s.UpdateId, "update-id", "", "Update ID. If unset, defaults to a UUID. Must be unique per Workflow Execution.")
-	s.Command.PersistentFlags().StringVarP(&s.RunId, "run-id", "r", "", "Run ID. If unset, updates the currently-running Workflow Execution.")
-	s.Command.PersistentFlags().StringVar(&s.FirstExecutionRunId, "first-execution-run-id", "", "Parent Run ID. The update is sent to the last Workflow Execution in the chain started with this Run ID.")
+	s.UpdateOptions.buildFlags(cctx, s.Command.PersistentFlags())
 	s.Command.PersistentFlags().SetNormalizeFunc(aliasNormalizer(map[string]string{
 		"type": "name",
 	}))

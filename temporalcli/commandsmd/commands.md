@@ -2525,7 +2525,7 @@ Includes options set for [workflow reference](#options-set-for-workflow-referenc
 
 Synonym of `temporal workflow update execute`.
 
-#### Options
+#### Options set for update
 
 * `--name` (string) -
   Handler method name.

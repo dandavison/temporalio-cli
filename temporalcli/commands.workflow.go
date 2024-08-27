@@ -192,11 +192,11 @@ func (c *TemporalWorkflowUpdateCommand) run(cctx *CommandContext, args []string)
 }
 
 func (c *TemporalWorkflowUpdateExecuteCommand) run(cctx *CommandContext, args []string) error {
-	return workflowUpdateHelper(cctx, c.Parent.Parent, c.Parent.PayloadInputOptions, c.UpdateOptions, client.WorkflowUpdateStageCompleted)
+	return workflowUpdateHelper(cctx, c.Parent.Parent, c.Parent.PayloadInputOptions, c.Parent.UpdateOptions, client.WorkflowUpdateStageCompleted)
 }
 
 func (c *TemporalWorkflowUpdateStartCommand) run(cctx *CommandContext, args []string) error {
-	return workflowUpdateHelper(cctx, c.Parent.Parent, c.Parent.PayloadInputOptions, c.UpdateOptions, client.WorkflowUpdateStageAccepted)
+	return workflowUpdateHelper(cctx, c.Parent.Parent, c.Parent.PayloadInputOptions, c.Parent.UpdateOptions, client.WorkflowUpdateStageAccepted)
 }
 
 func workflowUpdateHelper(cctx *CommandContext,
