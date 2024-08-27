@@ -368,20 +368,23 @@ func (s *SharedServerSuite) TestWorkflow_Cancel_SingleWorkflowSuccess() {
 	s.Error(workflow.ErrCanceled, run.Get(s.Context, nil))
 }
 
-func (s *SharedServerSuite) TestWorkflow_Update() {
+func (s *SharedServerSuite) TestWorkflow_Update_Execute() {
 	workflowUpdateTest{
-		s:             s,
-		useSubcommand: true,
+		s:        s,
+		useStart: false,
 	}.testWorkflowUpdateHelper()
-	// workflowUpdateTest{
-	// 	s:             s,
-	// 	useSubcommand: false,
-	// }.testWorkflowUpdateHelper()
+}
+
+func (s *SharedServerSuite) TestWorkflow_Update_Start() {
+	workflowUpdateTest{
+		s:        s,
+		useStart: true,
+	}.testWorkflowUpdateHelper()
 }
 
 type workflowUpdateTest struct {
-	s             *SharedServerSuite
-	useSubcommand bool
+	s        *SharedServerSuite
+	useStart bool
 }
 
 func (t workflowUpdateTest) testWorkflowUpdateHelper() {
@@ -471,20 +474,25 @@ func (t workflowUpdateTest) testWorkflowUpdateHelper() {
 }
 
 func (t workflowUpdateTest) execute(args ...string) *CommandResult {
-	if !(len(args) >= 2 && args[0] == "workflow" && args[1] == "update") {
-		panic("First two arguments must be 'workflow' and 'update'")
+	if !(len(args) >= 3 && args[0] == "workflow" && args[1] == "update" && (args[2] == "execute" || args[2] == "start")) {
+		panic("invalid args passed to execute in `workflow update` test")
 	}
-	if t.useSubcommand {
-		if !(len(args) >= 3 && (args[2] == "execute" || args[2] == "start")) {
-			panic("When useSubcommand is true, the third argument must be 'execute' or 'start'")
-		}
+	if t.useStart {
+		// Test `update start` by confirming that we can start the update and
+		// then use `update execute` to wait for it to complete.
+		updateID := uuid.NewString()
+
+		startArgs := append(args[:2], "start", "--update-id", updateID)
+		startArgs = append(startArgs, args[3:]...)
+		res := t.s.Execute(startArgs...)
+		t.s.Contains(res.Stdout.String(), updateID)
+
+		executeArgs := append(args[:2], "execute", "--update-id", updateID)
+		executeArgs = append(executeArgs, args[3:]...)
+		return t.s.Execute(executeArgs...)
 	} else {
-		if !(len(args) >= 3 && args[2] == "execute") {
-			panic("When useSubcommand is false, the third argument must be 'execute'")
-		}
-		args = append(args[:2], args[3:]...)
+		return t.s.Execute(args...)
 	}
-	return t.s.Execute(args...)
 }
 
 func (s *SharedServerSuite) TestWorkflow_Cancel_BatchWorkflowSuccess() {
