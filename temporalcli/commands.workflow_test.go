@@ -4,6 +4,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"math/rand"
+	"regexp"
 	"strconv"
 	"time"
 
@@ -471,19 +472,19 @@ func (t workflowUpdateTest) execute(args ...string) *CommandResult {
 	if t.useStart {
 		// Test `update start` by confirming that we can start the update and
 		// then use `update execute` to wait for it to complete.
-		updateID := uuid.NewString()
-
-		startArgs := append(args[:2], "start", "--update-id", updateID)
-		startArgs = append(startArgs, args[3:]...)
-		fmt.Println("startArgs", startArgs)
+		startArgs := append([]string{"workflow", "update", "start"}, args[3:]...)
 		res := t.s.Execute(startArgs...)
-		fmt.Println("stdout", res.Stdout.String())
-		fmt.Println("stderr", res.Stderr.String())
-		t.s.Contains(res.Stdout.String(), updateID)
 
-		executeArgs := append(args[:2], "execute", "--update-id", updateID)
-		executeArgs = append(executeArgs, args[3:]...)
-		return t.s.Execute(executeArgs...)
+		fmt.Println("args", startArgs)
+		fmt.Println("stderr", res.Stderr.String())
+		fmt.Println("stdout", res.Stdout.String())
+
+		match := regexp.MustCompile(`UpdateID\s+(\S+)`).FindStringSubmatch(res.Stdout.String())
+
+		t.s.Equal(2, len(match), "stdout did not contain update ID in expected format")
+		updateID := match[1]
+
+		return t.s.Execute("workflow", "update", "execute", "--address", t.s.Address(), "--update-id", updateID)
 	} else {
 		return t.s.Execute(args...)
 	}
