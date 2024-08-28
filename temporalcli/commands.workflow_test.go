@@ -402,7 +402,7 @@ func (t workflowUpdateTest) testWorkflowUpdateHelper() {
 			func(ctx workflow.Context, i float64) (float64, error) {
 				tmp := counter
 				counter += i
-				workflow.GetLogger(ctx).Info("counter updated", "added", i, "new-value", counter)
+				fmt.Println("counter updated", "added", i, "new-value", counter)
 				return tmp, nil
 			},
 			workflow.UpdateHandlerOptions{
@@ -475,7 +475,10 @@ func (t workflowUpdateTest) execute(args ...string) *CommandResult {
 
 		startArgs := append(args[:2], "start", "--update-id", updateID)
 		startArgs = append(startArgs, args[3:]...)
+		fmt.Println("startArgs", startArgs)
 		res := t.s.Execute(startArgs...)
+		fmt.Println("stdout", res.Stdout.String())
+		fmt.Println("stderr", res.Stderr.String())
 		t.s.Contains(res.Stdout.String(), updateID)
 
 		executeArgs := append(args[:2], "execute", "--update-id", updateID)
