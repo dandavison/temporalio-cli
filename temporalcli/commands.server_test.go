@@ -114,6 +114,7 @@ func TestServer_StartDev_ConcurrentStarts(t *testing.T) {
 		resCh := make(chan *CommandResult, 1)
 		go func() {
 			resCh <- h.Execute("server", "start-dev", "-p", port, "--headless", "--log-level", "never")
+
 		}()
 
 		// Try to connect for a bit while checking for error
