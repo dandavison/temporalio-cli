@@ -489,36 +489,35 @@ func (t workflowUpdateTest) execute(args ...string) *CommandResult {
 		startArgs := append([]string{"workflow", "update", "start"}, args[3:]...)
 		res := t.s.Execute(startArgs...)
 		t.s.NoError(res.Err)
-
-		fmt.Println("args", startArgs)
-		fmt.Println("err", res.Err)
-		fmt.Println("stderr", res.Stderr.String())
-		fmt.Println("stdout", res.Stdout.String())
-
-		match := regexp.MustCompile(`UpdateID\s+(\S+)`).FindStringSubmatch(res.Stdout.String())
-
-		t.s.Equal(2, len(match), "stdout did not contain update ID in expected format")
-		updateID := match[1]
-
-		var workflowID string
-		var name string
-		for i, arg := range args {
-			if arg == "-w" && i+1 < len(args) {
-				workflowID = startArgs[i+1]
-			} else if arg == "--name" || arg == "--type" && i+1 < len(args) {
-				name = args[i+1]
-			}
-		}
-		if workflowID == "" {
-			panic("No workflow ID found in args")
-		}
-		if name == "" {
-			panic("No update name found in args")
-		}
+		workflowID, updateID, name := t.extractWorkflowIDUpdateIDAndUpdateName(args, res.Stdout.String())
 		return t.s.Execute("workflow", "update", "execute", "--address", t.s.Address(), "-w", workflowID, "--update-id", updateID, "--name", name)
 	} else {
 		return t.s.Execute(args...)
 	}
+}
+
+func (t workflowUpdateTest) extractWorkflowIDUpdateIDAndUpdateName(args []string, stdout string) (string, string, string) {
+	match := regexp.MustCompile(`UpdateID\s+(\S+)`).FindStringSubmatch(stdout)
+
+	t.s.Equal(2, len(match), "stdout did not contain update ID in expected format")
+	updateID := match[1]
+
+	var workflowID string
+	var name string
+	for i, arg := range args {
+		if arg == "-w" && i+1 < len(args) {
+			workflowID = args[i+1]
+		} else if arg == "--name" || arg == "--type" && i+1 < len(args) {
+			name = args[i+1]
+		}
+	}
+	if workflowID == "" {
+		panic("No workflow ID found in args")
+	}
+	if name == "" {
+		panic("No update name found in args")
+	}
+	return workflowID, updateID, name
 }
 
 func (s *SharedServerSuite) TestWorkflow_Cancel_BatchWorkflowSuccess() {
