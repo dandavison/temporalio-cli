@@ -464,16 +464,24 @@ func (t workflowUpdateTest) testWorkflowUpdateHelper() {
 	t.s.ContainsOnSameLine(res.Stdout.String(), "UpdateID", strconv.Itoa(input))
 	t.s.ContainsOnSameLine(res.Stdout.String(), "Result", strconv.Itoa(3*input))
 
-	for _, verb := range []string{"execute"} {
-		// update rejected, name not supplied
-		res = t.s.Execute("workflow", "update", verb, "--address", t.s.Address(), "-w", run.GetID(), "-i", strconv.Itoa(input))
-		t.s.ErrorContains(res.Err, "required flag(s) \"name\" not set")
+	verb := ""
+	if t.useStart {
+		verb = "start"
+	} else {
+		verb = "execute"
+	}
 
-		// update rejected, wrong workflowID
-		res = t.s.Execute("workflow", "update", verb, "--address", t.s.Address(), "-w", "nonexistent-wf-id", "--name", updateName, "-i", strconv.Itoa(input))
-		t.s.ErrorContains(res.Err, "unable to update workflow")
+	// update rejected, name not supplied
+	res = t.s.Execute("workflow", "update", verb, "--address", t.s.Address(), "-w", run.GetID(), "-i", strconv.Itoa(input))
+	t.s.ErrorContains(res.Err, "required flag(s) \"name\" not set")
 
+	// update rejected, wrong workflowID
+	res = t.s.Execute("workflow", "update", verb, "--address", t.s.Address(), "-w", "nonexistent-wf-id", "--name", updateName, "-i", strconv.Itoa(input))
+	t.s.ErrorContains(res.Err, "unable to update workflow")
+
+	if verb == "execute" {
 		// update rejected, wrong update name
+		// This is not currently an error when using `update start`: the SDK accepts the update before checking whether a handler exists.
 		res = t.s.Execute("workflow", "update", verb, "--address", t.s.Address(), "-w", run.GetID(), "--name", "nonexistent-update-name", "-i", strconv.Itoa(input))
 		t.s.ErrorContains(res.Err, "unable to update workflow")
 	}
