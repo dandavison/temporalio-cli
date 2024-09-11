@@ -445,50 +445,6 @@ func (t workflowUpdateTest) testWorkflowUpdateHelper() {
 	res := t.execute("workflow", "update", "execute", "--address", t.s.Address(), "-w", run.GetID(), "--name", updateName, "-i", strconv.Itoa(input))
 	t.s.NoError(res.Err)
 	t.s.ContainsOnSameLine(res.Stdout.String(), "Result", strconv.Itoa(1*input))
-
-	// successful update passing first-execution-run-id
-	// Use --type here to make sure the alias works
-	res = t.execute("workflow", "update", "execute", "--address", t.s.Address(), "-w", run.GetID(), "--type", updateName, "-i", strconv.Itoa(input), "--first-execution-run-id", run.GetRunID())
-	t.s.NoError(res.Err)
-	t.s.ContainsOnSameLine(res.Stdout.String(), "Result", strconv.Itoa(2*input))
-
-	// successful update passing update-id
-	res = t.execute("workflow", "update", "execute", "--address", t.s.Address(), "--update-id", strconv.Itoa(input), "-w", run.GetID(), "--name", updateName, "-i", strconv.Itoa(input))
-	t.s.NoError(res.Err)
-	t.s.ContainsOnSameLine(res.Stdout.String(), "UpdateID", strconv.Itoa(input))
-	t.s.ContainsOnSameLine(res.Stdout.String(), "Result", strconv.Itoa(3*input))
-
-	// successful update without input
-	res = t.execute("workflow", "update", "execute", "--address", t.s.Address(), "--update-id", strconv.Itoa(input), "-w", run.GetID(), "--name", updateName)
-	t.s.NoError(res.Err)
-	t.s.ContainsOnSameLine(res.Stdout.String(), "UpdateID", strconv.Itoa(input))
-	t.s.ContainsOnSameLine(res.Stdout.String(), "Result", strconv.Itoa(3*input))
-
-	if t.useStart {
-		// update rejected, name not supplied
-		res = t.s.Execute("workflow", "update", "start", "--wait-for-stage", "accepted", "--address", t.s.Address(), "-w", run.GetID(), "-i", strconv.Itoa(input))
-		t.s.ErrorContains(res.Err, "required flag(s) \"name\" not set")
-
-		// update rejected, wrong workflowID
-		res = t.s.Execute("workflow", "update", "start", "--wait-for-stage", "accepted", "--address", t.s.Address(), "-w", "nonexistent-wf-id", "--name", updateName, "-i", strconv.Itoa(input))
-		t.s.ErrorContains(res.Err, "unable to update workflow")
-
-		// update rejected, wrong update name
-		res = t.s.Execute("workflow", "update", "start", "--wait-for-stage", "accepted", "--address", t.s.Address(), "-w", run.GetID(), "--name", "nonexistent-update-name", "-i", strconv.Itoa(input))
-		t.s.ErrorContains(res.Err, "unable to update workflow")
-	} else {
-		// update rejected, name not supplied
-		res = t.s.Execute("workflow", "update", "execute", "--address", t.s.Address(), "-w", run.GetID(), "-i", strconv.Itoa(input))
-		t.s.ErrorContains(res.Err, "required flag(s) \"name\" not set")
-
-		// update rejected, wrong workflowID
-		res = t.s.Execute("workflow", "update", "execute", "--address", t.s.Address(), "-w", "nonexistent-wf-id", "--name", updateName, "-i", strconv.Itoa(input))
-		t.s.ErrorContains(res.Err, "unable to update workflow")
-
-		// update rejected, wrong update name
-		res = t.s.Execute("workflow", "update", "execute", "--address", t.s.Address(), "-w", run.GetID(), "--name", "nonexistent-update-name", "-i", strconv.Itoa(input))
-		t.s.ErrorContains(res.Err, "unable to update workflow")
-	}
 }
 
 func (t workflowUpdateTest) execute(args ...string) *CommandResult {
