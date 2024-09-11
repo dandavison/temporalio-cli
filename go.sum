@@ -350,8 +350,6 @@ go.opentelemetry.io/proto/otlp v1.2.0 h1:pVeZGk7nXDC9O2hncA6nHldxEjm6LByfA2aN8IO
 go.opentelemetry.io/proto/otlp v1.2.0/go.mod h1:gGpR8txAl5M03pDhMC79G6SdqNV26naRm/KDsgaHD8A=
 go.temporal.io/api v1.38.0 h1:L5i+Ai7UoBa2Gq/goVHLY32064AgawxPDLkKm4I7fu4=
 go.temporal.io/api v1.38.0/go.mod h1:fmh06EjstyrPp6SHbjJo7yYHBfHamPE4SytM+2NRejc=
-go.temporal.io/sdk v1.29.0 h1:AHObeNFFxVlnaj7jql3Bjd4B0bMBaXkywJU0uVIPgJo=
-go.temporal.io/sdk v1.29.0/go.mod h1:kp//DRvn3CqQVBCtjL51Oicp9wrZYB2s6row1UgzcKQ=
 go.temporal.io/server v1.25.0 h1:HwP7musDblTbobv8727t5riWB5T1UKqUZBLmIrWFwF8=
 go.temporal.io/server v1.25.0/go.mod h1:+8eYt3bSdHzPDMyEW3RgtsbAJRblhUEH0PVRSPiMyUs=
 go.temporal.io/version v0.3.0 h1:dMrei9l9NyHt8nG6EB8vAwDLLTwx2SvRyucCSumAiig=
