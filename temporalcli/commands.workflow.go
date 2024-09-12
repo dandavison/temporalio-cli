@@ -210,6 +210,8 @@ func workflowUpdateHelper(cctx *CommandContext,
 	updateOpts UpdateOptions,
 	waitForStage client.WorkflowUpdateStage,
 ) error {
+	LogToFile("workflowUpdateHelper", "", "blue")
+
 	cl, err := clientOpts.dialClient(cctx)
 	if err != nil {
 		return err
