@@ -2,6 +2,12 @@ module github.com/temporalio/cli
 
 go 1.22.3
 
+replace (
+	go.temporal.io/api => ../api-go
+	go.temporal.io/sdk => ../sdk-go
+	go.temporal.io/server => ../temporal
+)
+
 require (
 	github.com/alitto/pond v1.9.1
 	github.com/davecgh/go-spew v1.1.2-0.20180830191138-d8f796af33cc
