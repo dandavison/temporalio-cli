@@ -2,7 +2,11 @@ module github.com/temporalio/cli
 
 go 1.22.3
 
-replace go.temporal.io/sdk => ../sdk-go
+replace (
+	go.temporal.io/api => ../api-go
+	go.temporal.io/sdk => ../sdk-go
+	go.temporal.io/server => ../temporal
+)
 
 require (
 	github.com/alitto/pond v1.9.1
