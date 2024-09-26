@@ -3,6 +3,7 @@ package temporalcli_test
 import (
 	"context"
 	"fmt"
+	"strings"
 	"sync/atomic"
 	"testing"
 	"time"
@@ -301,8 +302,22 @@ func (s *SharedServerSuite) TestWorkflow_Reset_ReapplyExcludeSignal() {
 	s.Equal(2, timesSignalSeen, "Should only see original signals and not after reset")
 }
 
+type WorkflowResetTest struct {
+	s              *SharedServerSuite
+	reapplyType    string
+	reapplyExclude []string
+}
+
 func (s *SharedServerSuite) TestWorkflow_Reset_ReapplyUpdate() {
-	var wfExecutions, timesUpdateSeen int
+	t := WorkflowResetTest{
+		s: s,
+	}
+	t.run()
+}
+
+func (t *WorkflowResetTest) run() {
+	s := t.s
+	var wfExecutions, timesUpdateSeen, timesSignalSeen int
 	s.Worker().OnDevWorkflow(func(ctx workflow.Context, a any) (any, error) {
 		workflow.SetUpdateHandler(ctx, "myUpdate", func(ctx workflow.Context) error {
 			timesUpdateSeen++
@@ -352,16 +367,54 @@ func (s *SharedServerSuite) TestWorkflow_Reset_ReapplyUpdate() {
 	s.Equal(1, wfExecutions)
 
 	// Reset to the beginning
-	res := s.Execute(
+	args := []string{
 		"workflow", "reset",
 		"--address", s.Address(),
 		"-w", run.GetID(),
 		"--event-id", "3",
 		"--reason", "test-reset-FirstWorkflowTask",
-	)
+	}
+	if t.reapplyType != "" {
+		args = append(args, "--reapply-type", t.reapplyType)
+	}
+	if t.reapplyExclude != nil {
+		args = append(args, "--reapply-exclude", strings.Join(t.reapplyExclude, ","))
+	}
+	res := s.Execute(args...)
 	require.NoError(s.T(), res.Err)
 	s.awaitNextWorkflow(searchAttr)
-	s.Equal(4, timesUpdateSeen, "Should only see original updates and not after reset")
+
+	expectUpdatesReapplied := true
+	expectSignalsReapplied := true
+	if len(t.reapplyExclude) > 0 {
+		s.Empty(t.reapplyType, "Cannot pass both --reapply-type and --reapply-exclude")
+		for _, exclude := range t.reapplyExclude {
+			if exclude == "Signal" {
+				expectSignalsReapplied = false
+			}
+			if exclude == "Update" {
+				expectUpdatesReapplied = false
+			}
+			if exclude == "All" {
+				expectUpdatesReapplied = false
+				expectSignalsReapplied = false
+			}
+		}
+	} else {
+		if t.reapplyType == "Signal" {
+			expectUpdatesReapplied = false
+		}
+		if t.reapplyType == "Update" {
+			expectSignalsReapplied = false
+		}
+	}
+
+	if expectUpdatesReapplied {
+		s.Equal(4, timesUpdateSeen)
+	}
+	if expectSignalsReapplied {
+		s.Equal(0, timesSignalSeen)
+	}
 	s.Equal(2, wfExecutions)
 }
 
