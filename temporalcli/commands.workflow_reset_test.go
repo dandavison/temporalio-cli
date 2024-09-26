@@ -329,6 +329,7 @@ func (s *SharedServerSuite) TestWorkflow_Reset_ReapplyUpdate() {
 	)
 	s.NoError(err)
 
+	// Send to updates
 	updateHandle1, err := s.Client.UpdateWorkflow(s.Context, client.UpdateWorkflowOptions{
 		WorkflowID:   run.GetID(),
 		RunID:        run.GetRunID(),
