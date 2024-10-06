@@ -1,6 +1,7 @@
 module github.com/temporalio/cli
 
 go 1.22.3
+replace go.temporal.io/server => ../temporal
 
 require (
 	github.com/alitto/pond v1.9.1
