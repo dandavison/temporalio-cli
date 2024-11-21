@@ -128,21 +128,6 @@ func Start(options StartOptions) (*Server, error) {
 	// Start. We have to start UI server in background because it's start call is
 	// blocking. Therefore we have no way to relay error out to users, so we just
 	// log and panic.
-	if ui != nil {
-		go func() {
-			if err := ui.Start(); err != nil {
-				options.Logger.Error("failed running UI server", "error", err)
-				panic(err)
-			}
-		}()
-	}
-	if err := server.Start(); err != nil {
-		// Stop UI before returning to avoid leaks
-		if ui != nil {
-			ui.Stop()
-		}
-		return nil, err
-	}
 	return &Server{server, ui}, nil
 }
 
