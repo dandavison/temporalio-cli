@@ -1,15 +1,6 @@
-name: Build docker images
+name: Build docker image
 on:
-  workflow_call:
-    inputs:
-      do-push:
-        description: If set, push the built image to Docker Hub.
-        type: boolean
-        default: false
-      as-latest:
-        description: If set, tag the images as latest for the lang ('<lang>-latest').
-        type: boolean
-        default: false
+  workflow_dispatch:
 
 jobs:
   build-image:
@@ -30,13 +21,23 @@ jobs:
           go-version: '^1.20'
 
       - name: Lint dockerfile
-        run: docker run --rm -i hadolint/hadolint < dockerfiles/${{inputs.lang}}.Dockerfile
+        run: docker run --rm -i hadolint/hadolint < .Dockerfile
 
       - name: Build docker image
+        shell: bash
         run: |
-          go run ./cmd build-docker-image \
-          --version ${{ inputs.sdk-version }} \
-          --save-image /tmp/image.tar
+          docker build --pull \
+            --tag temporalio/cli:1.21.0 \
+            --label org.opencontainers.image.created=$(date -u +"%Y-%m-%dT%H:%M:%SZ") \
+            --label org.opencontainers.image.source=https://github.com/temporalio/cli \
+            --label org.opencontainers.image.vendor=Temporal Technologies Inc. \
+            --label org.opencontainers.image.authors=Temporal Maintainers <cli@temporal.io> \
+            --label org.opencontainers.image.licenses=MIT \
+            --label org.opencontainers.image.title=Temporal CLI \
+            --label org.opencontainers.image.documentation=https://github.com/temporalio/cli/blob/main/README.md \
+            --label org.opencontainers.image.version=1.21.0 \
+            --label io.temporal.cli.version=1.21.0 \
+            .
 
       - name: Prepare docker artifact
         run: |
