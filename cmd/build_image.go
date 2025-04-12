@@ -1,4 +1,4 @@
-package cmd
+package main
 
 import (
 	"context"
@@ -16,33 +16,51 @@ import (
 	"golang.org/x/mod/semver"
 )
 
-// Removed rootDir stub - uses definition from github.go
+// --- Main Application Logic ---
 
-// Removed writeGitHubEnv stub - uses definition from github.go
+func main() {
+	// Logger initialization needs to happen early
+	zapLogger, err := zap.NewDevelopment() // Or zap.NewProduction()
+	if err != nil {
+		fmt.Fprintf(os.Stderr, "Failed to initialize logger: %v\n", err)
+		os.Exit(1)
+	}
+	defer zapLogger.Sync() // Flushes buffer, if any
+	logger := zapLogger.Sugar()
 
-func BuildCliImageCmd() *cobra.Command { // Exported function name
+	// Create and execute the command
+	rootCmd := buildCliImageCmd(logger) // Pass logger to command builder
+	if err := rootCmd.Execute(); err != nil {
+		// Cobra automatically prints errors, but we log fatally just in case
+		// and to ensure non-zero exit code if Execute doesn't handle it.
+		logger.Fatalf("Command execution failed: %v", err)
+		// os.Exit(1) // Fatalf already exits
+	}
+}
+
+// buildCliImageCmd sets up the cobra command structure
+func buildCliImageCmd(logger *zap.SugaredLogger) *cobra.Command { // Accept logger
 	var b cliImageBuilder
+	b.logger = logger // Assign logger to the builder instance
+
 	cmd := &cobra.Command{
-		Use:   "build-docker-image",
+		Use:   "build-docker-image", // This will be the executable name if built directly
 		Short: "Build Temporal CLI Docker image",
 		Run: func(cmd *cobra.Command, args []string) {
-			// Initialize logger here before calling build
-			var err error
-			var zapLogger *zap.Logger
-			// Basic Zap logger configuration
-			zapLogger, err = zap.NewDevelopment() // Or zap.NewProduction()
-			if err != nil {
-				fmt.Fprintf(os.Stderr, "Failed to initialize logger: %v\n", err)
-				os.Exit(1)
-			}
-			defer zapLogger.Sync() // Flushes buffer, if any
-			b.logger = zapLogger.Sugar()
-
+			// The actual build logic is called here
+			// Logger is already initialized and assigned to b.logger
 			if err := b.build(cmd.Context()); err != nil {
-				b.logger.Fatalf("Build failed: %v", err) // Use Fatalf for logging + exit(1)
+				// Log the error using the already initialized logger
+				// Use Errorf because Fatalf would exit(1) prematurely if Execute is supposed to handle exit codes.
+				// Cobra's default behavior usually prints the error from RunE returning an error.
+				b.logger.Errorf("Build failed: %v", err)
+				os.Exit(1) // Explicitly exit non-zero on build error
 			}
 			b.logger.Info("Build successful.")
 		},
+		// Silence errors/usage because we handle logging in Run/main
+		SilenceErrors: true,
+		SilenceUsage:  true,
 	}
 	b.addCLIFlags(cmd.Flags())
 	cmd.MarkFlagRequired("version")
@@ -86,7 +104,7 @@ func (b *cliImageBuilder) build(ctx context.Context) error {
 	b.tags = append([]string{b.version}, b.tags...) // Prepend version tag
 
 	// --- Setup Standard Labels ---
-	gitRef, err := gitRef(".git")
+	gitRef, err := gitRef(".git") // Use helper defined below
 	if err != nil {
 		// Log warning instead of failing if git ref cannot be determined (e.g., not in git repo)
 		b.logger.Warnf("Could not determine git revision: %v. Proceeding without revision label.", err)
@@ -147,7 +165,7 @@ func (b *cliImageBuilder) build(ctx context.Context) error {
 	// }
 
 	// Add build context (the repository root)
-	dockerArgs = append(dockerArgs, rootDir())
+	dockerArgs = append(dockerArgs, rootDir()) // Use helper defined below
 
 	b.logger.Infof("Running docker command: docker %v", strings.Join(dockerArgs, " "))
 	if b.dryRun {
@@ -158,13 +176,14 @@ func (b *cliImageBuilder) build(ctx context.Context) error {
 	// --- Execute Build ---
 	// Write image tags to GitHub env if needed
 	if os.Getenv("GITHUB_ACTIONS") == "true" {
-		err = writeGitHubEnv("FEATURES_BUILT_IMAGE_TAGS", strings.Join(imageTagsForPublish, ";"))
+		err = writeGitHubEnv("FEATURES_BUILT_IMAGE_TAGS", strings.Join(imageTagsForPublish, ";")) // Use helper defined below
 		if err != nil {
 			// Log warning, don't fail the build just for this
 			b.logger.Warnf("Writing image tags to github env failed: %v", err)
 		}
 	}
 
+	// Use CommandContext for better control over execution and potential cancellation
 	cmd := exec.CommandContext(ctx, "docker", dockerArgs...)
 	cmd.Stdout = os.Stdout // Pipe docker build output directly
 	cmd.Stderr = os.Stderr
@@ -180,12 +199,13 @@ func (b *cliImageBuilder) build(ctx context.Context) error {
 		b.logger.Infof("Saving image %s to %s", imageNameAndVersionTag, b.saveImage)
 		// Write the saved image tag to GitHub env if needed
 		if os.Getenv("GITHUB_ACTIONS") == "true" {
-			err = writeGitHubEnv("SAVED_IMAGE_TAG", imageNameAndVersionTag)
+			err = writeGitHubEnv("SAVED_IMAGE_TAG", imageNameAndVersionTag) // Use helper defined below
 			if err != nil {
 				b.logger.Warnf("Writing saved image tag to github env failed: %v", err)
 			}
 		}
 
+		// Use CommandContext for saving as well
 		saveCmd := exec.CommandContext(ctx, "docker", "save", "-o", b.saveImage, imageNameAndVersionTag)
 		saveCmd.Stdout = os.Stdout // Show output of save command
 		saveCmd.Stderr = os.Stderr
@@ -211,11 +231,11 @@ func (b *cliImageBuilder) addLabelIfNotPresent(key, value string) {
 	b.labels = append(b.labels, prefix+value)
 }
 
-// Removed gitRef stub - uses definition from github.go
+// --- Helper Functions (copied back for standalone script) ---
 
 const errFileCmdFmt = "failed to write to github file: %v"
 
-// Set a GitHub environment value. Only works with values without a linebreak.
+// writeGitHubEnv sets a GitHub environment value. Only works with values without a linebreak.
 func writeGitHubEnv(name string, value string) (retErr error) {
 	filepath := os.Getenv("GITHUB_ENV")
 	if filepath == "" {
@@ -230,7 +250,8 @@ func writeGitHubEnv(name string, value string) (retErr error) {
 
 	defer func() {
 		if err := f.Close(); err != nil && retErr == nil {
-			retErr = err
+			// Assign error to the named return variable
+			retErr = fmt.Errorf("failed closing github file: %w", err)
 		}
 	}()
 
@@ -239,20 +260,54 @@ func writeGitHubEnv(name string, value string) (retErr error) {
 		retErr = fmt.Errorf(errFileCmdFmt, err)
 		return
 	}
-	return
+	return // Use named return
 }
 
-func gitRef(gitDir string) (string, error) {
-	cmd := exec.Command("git", "--git-dir", gitDir, "rev-parse", "HEAD")
-	cmd.Stderr = os.Stderr
+// gitRef gets the current commit hash (long).
+func gitRef(gitDir string) (string, error) { // Removed context argument
+	// Ensure the .git directory path is correct relative to where the command runs
+	if !filepath.IsAbs(gitDir) {
+		wd, err := os.Getwd()
+		if err != nil {
+			return "", fmt.Errorf("failed to get working directory: %w", err)
+		}
+		gitDir = filepath.Join(wd, gitDir)
+	}
+
+	// Check if .git directory exists before running git command
+	if _, err := os.Stat(gitDir); os.IsNotExist(err) {
+		fmt.Fprintf(os.Stderr, "Warning: git directory %q not found: %v\n", gitDir, err)
+		return "unknown", nil // Return placeholder instead of erroring
+	}
+
+	cmd := exec.Command("git", "--git-dir", gitDir, "rev-parse", "HEAD") // Removed context
+	var stderr strings.Builder
+	cmd.Stderr = &stderr
 	out, err := cmd.Output()
 	if err != nil {
-		return "", fmt.Errorf("failed getting git ref: %w", err)
+		// Try getting the short ref as a fallback for shallow clones in CI
+		cmdShort := exec.Command("git", "--git-dir", gitDir, "rev-parse", "--short", "HEAD") // Removed context
+		cmdShort.Stderr = &stderr                                                            // Reuse stderr builder
+		outShort, errShort := cmdShort.Output()
+		if errShort == nil {
+			fmt.Fprintf(os.Stderr, "Warning: could not get full git ref, using short ref: %v (stderr: %q)\n", err, stderr.String())
+			return strings.TrimSpace(string(outShort)), nil
+		}
+		// If both failed, return the original error
+		return "", fmt.Errorf("failed getting git ref from %s (stderr: %q): %w", gitDir, stderr.String(), err)
 	}
-	return strings.TrimRight(string(out), "\r\n"), nil
+	return strings.TrimSpace(string(out)), nil
 }
 
+// rootDir calculates the repository root based on the location of this file.
 func rootDir() string {
-	_, currFile, _, _ := runtime.Caller(0)
-	return filepath.Dir(filepath.Dir(currFile))
+	_, currFile, _, ok := runtime.Caller(0)
+	if !ok {
+		// Fallback if Caller info isn't available
+		fmt.Fprintln(os.Stderr, "Warning: Could not determine caller information for rootDir, falling back to '.'")
+		return "."
+	}
+	// Assumes this file is in '<root>/cmd/' or similar, go up one/two levels
+	// Adjust if the script location changes relative to the root
+	return filepath.Dir(filepath.Dir(currFile)) // Go up two levels from cmd/build_image.go to get repo root
 }
