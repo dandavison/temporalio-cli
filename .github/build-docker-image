@@ -1,0 +1,253 @@
+#!/usr/bin/env uv run --script
+# /// script
+# requires-python = ">=3.12"
+# dependencies = [
+#     "semver"
+#     "typer",
+# ]
+# ///
+import datetime
+import os
+import shlex
+import subprocess
+import sys
+from pathlib import Path
+from typing import List, Optional, Tuple
+
+import semver
+import typer
+
+app = typer.Typer(add_completion=False)
+
+
+def run_command(
+    cmd_list: List[str], dry_run: bool, check: bool = True
+) -> subprocess.CompletedProcess | None:
+    """Runs a command, printing it first."""
+    print(
+        f"Running: {' '.join(shlex.quote(str(s)) for s in cmd_list)}", file=sys.stderr
+    )
+    if dry_run:
+        return None
+    return subprocess.run(cmd_list, check=check, text=True)
+
+
+def get_git_ref(git_dir: Path | str = ".git") -> str:
+    """Gets the current git commit SHA."""
+    try:
+        result = subprocess.run(
+            ["git", "--git-dir", str(git_dir), "rev-parse", "HEAD"],
+            capture_output=True,
+            text=True,
+            check=True,
+        )
+        return result.stdout.strip()
+    except (subprocess.CalledProcessError, FileNotFoundError) as e:
+        print(f"Warning: Failed getting git ref: {e}", file=sys.stderr)
+        return "unknown"
+
+
+def write_github_env(key: str, value: str):
+    """Writes a key-value pair to the GitHub environment file if it exists."""
+    github_env_path = os.getenv("GITHUB_ENV")
+    if github_env_path and os.path.exists(github_env_path):
+        try:
+            with open(github_env_path, "a") as f:
+                f.write(f"{key}={value}\n")
+            print(f"Successfully wrote {key} to $GITHUB_ENV", file=sys.stderr)
+        except Exception as e:
+            print(f"Warning: Failed writing {key} to $GITHUB_ENV: {e}", file=sys.stderr)
+    else:
+        print(
+            f"Skipping writing {key} to $GITHUB_ENV (file not found or path not set)",
+            file=sys.stderr,
+        )
+
+
+def add_label_if_not_present(labels: List[str], key: str, value: str):
+    """Adds a label key=value if the key is not already present."""
+    prefix = f"{key}="
+    if not any(label.startswith(prefix) for label in labels):
+        labels.append(f"{prefix}{value}")
+
+
+@app.command(help="Build an Omes worker Docker image.")
+def main(
+    version: str = typer.Option(
+        ...,
+        "--version",
+        help="Version to build. Treated as path if it contains '/', otherwise must be valid semver.",
+    ),
+    dockerfile: Path = typer.Option(
+        "Dockerfile",
+        "--dockerfile",
+        help="Path to the Dockerfile.",
+        exists=True,
+        file_okay=True,
+        dir_okay=False,
+        readable=True,
+    ),
+    tag_as_latest: bool = typer.Option(
+        False,
+        "--tag-as-latest",
+        help="If set, tag the image as 'latest' in addition to other tags.",
+    ),
+    platform: Optional[str] = typer.Option(
+        None, "--platform", help="Platform for use in docker build --platform."
+    ),
+    image_name: str = typer.Option(
+        "omes", "--image-name", help="Name of the image to build."
+    ),
+    dry_run: bool = typer.Option(
+        False,
+        "--dry-run",
+        help="If set, just print the commands that would run but do not run them.",
+    ),
+    image_tag: List[str] = typer.Option(
+        None, "--image-tag", help="Additional tags to add to the image (e.g., my-tag)."
+    ),
+    image_label: List[str] = typer.Option(
+        None,
+        "--image-label",
+        help="Additional labels to add to the image (e.g., key=value).",
+    ),
+    save_image: Optional[Path] = typer.Option(
+        None,
+        "--save-image",
+        help="If set, run `docker save` on the produced image, saving it to the provided path.",
+    ),
+):
+    omes_version = get_git_ref()
+    build_args: List[Tuple[str, str]] = []
+    tags: List[str] = list(image_tag) if image_tag else []
+    labels: List[str] = list(image_label) if image_label else []
+
+    is_path_version = "/" in version or "\\" in version
+    version_path: Optional[Path] = None
+
+    if is_path_version:
+        version_path = Path(version).resolve()
+        if not tags:
+            raise typer.BadParameter(
+                "At least one --image-tag is required when --version is a path."
+            )
+        if not version_path.is_dir():
+            raise typer.BadParameter(f"Version path '{version}' is not a directory.")
+        try:
+            # Basic check to prevent escaping the project root - might need refinement
+            if Path.cwd() not in version_path.parents:
+                raise typer.BadParameter(
+                    "Version path must be beneath the current directory."
+                )
+        except ValueError:  # Handle case where paths are on different drives (Windows)
+            raise typer.BadParameter(
+                "Version path must be beneath the current directory."
+            )
+
+        build_args.append(("SDK_VERSION", "./repo"))
+        build_args.append(("SDK_DIR", version))  # Pass original path string to Docker
+    else:
+        version_semver = version
+        if not version.startswith("v"):
+            version_semver = f"v{version}"
+
+        try:
+            semver.Version.parse(version_semver.lstrip("v"))
+        except ValueError:
+            raise typer.BadParameter(f"Version '{version}' is not valid semver.")
+
+        build_args.append(("SDK_VERSION", version))
+        add_label_if_not_present(labels, "io.temporal.sdk.version", version)
+
+        # Add tag for omes_version-version and potentially version and latest
+        version_tag_component = version.lstrip("v")
+        tags.append(f"{omes_version}-{version_tag_component}")
+        if tag_as_latest:
+            tags.append(version_tag_component)
+            tags.append(
+                "latest"
+            )  # Simplified 'latest' compared to Go version's lang-latest
+
+    # Add standard OCI labels
+    add_label_if_not_present(
+        labels,
+        "org.opencontainers.image.created",
+        datetime.datetime.now(datetime.timezone.utc).isoformat(),
+    )
+    add_label_if_not_present(
+        labels, "org.opencontainers.image.source", "https://github.com/temporalio/omes"
+    )
+    add_label_if_not_present(
+        labels, "org.opencontainers.image.vendor", "Temporal Technologies Inc."
+    )
+    add_label_if_not_present(
+        labels,
+        "org.opencontainers.image.authors",
+        "Temporal SDK team <sdk-team@temporal.io>",
+    )  # Assuming generic authors now
+    add_label_if_not_present(labels, "org.opencontainers.image.licenses", "MIT")
+    add_label_if_not_present(labels, "org.opencontainers.image.revision", omes_version)
+    add_label_if_not_present(
+        labels, "org.opencontainers.image.title", "Omes Worker Image"
+    )  # Generic title
+    add_label_if_not_present(
+        labels,
+        "org.opencontainers.image.documentation",
+        "See README at https://github.com/temporalio/omes",
+    )
+    # Add omes labels
+    add_label_if_not_present(labels, "io.temporal.omes.githash", omes_version)
+
+    # Prepare docker command
+    docker_cmd = ["docker", "build", "--pull", "--file", str(dockerfile)]
+    if platform:
+        docker_cmd.extend(["--platform", platform])
+        build_args.append(("PLATFORM", platform))
+
+    image_tags_for_publish = []
+    for tag in tags:
+        full_tag = f"{image_name}:{tag}"
+        docker_cmd.extend(["--tag", full_tag])
+        image_tags_for_publish.append(full_tag)
+
+    for label in labels:
+        docker_cmd.extend(["--label", label])
+
+    for key, value in build_args:
+        docker_cmd.extend(["--build-arg", f"{key}={value}"])
+
+    # Context is the project root
+    docker_cmd.append(str(Path.cwd()))
+
+    # Run build
+    print("Building image...", file=sys.stderr)
+    build_result = run_command(docker_cmd, dry_run)
+    if build_result and build_result.returncode != 0:
+        raise typer.Exit(code=build_result.returncode)
+
+    if not dry_run:
+        write_github_env("FEATURES_BUILT_IMAGE_TAGS", ";".join(image_tags_for_publish))
+
+    # Save image if requested
+    if save_image:
+        if not image_tags_for_publish:
+            print(
+                "Warning: --save-image specified, but no tags were generated to save.",
+                file=sys.stderr,
+            )
+            raise typer.Exit(code=1)
+
+        save_tag = image_tags_for_publish[0]  # Save the first tag generated
+        save_cmd = ["docker", "save", "-o", str(save_image), save_tag]
+        print(f"Saving image {save_tag} to {save_image}...", file=sys.stderr)
+        save_result = run_command(save_cmd, dry_run)
+        if save_result and save_result.returncode != 0:
+            raise typer.Exit(code=save_result.returncode)
+        if not dry_run:
+            write_github_env("SAVED_IMAGE_TAG", save_tag)
+
+    print("Build complete.", file=sys.stderr)
+
+
+if __name__ == "__main__":
+    app()
