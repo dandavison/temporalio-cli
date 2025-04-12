@@ -5,6 +5,8 @@ import (
 	"fmt"
 	"os"
 	"os/exec"
+	"path/filepath"
+	"runtime"
 	"strings"
 	"time"
 
@@ -84,7 +86,7 @@ func (b *cliImageBuilder) build(ctx context.Context) error {
 	b.tags = append([]string{b.version}, b.tags...) // Prepend version tag
 
 	// --- Setup Standard Labels ---
-	gitRef, err := gitRef(ctx, ".git")
+	gitRef, err := gitRef(".git")
 	if err != nil {
 		// Log warning instead of failing if git ref cannot be determined (e.g., not in git repo)
 		b.logger.Warnf("Could not determine git revision: %v. Proceeding without revision label.", err)
@@ -210,3 +212,47 @@ func (b *cliImageBuilder) addLabelIfNotPresent(key, value string) {
 }
 
 // Removed gitRef stub - uses definition from github.go
+
+const errFileCmdFmt = "failed to write to github file: %v"
+
+// Set a GitHub environment value. Only works with values without a linebreak.
+func writeGitHubEnv(name string, value string) (retErr error) {
+	filepath := os.Getenv("GITHUB_ENV")
+	if filepath == "" {
+		// Just don't do anything if we're not running in a GH env
+		return nil
+	}
+	f, err := os.OpenFile(filepath, os.O_APPEND|os.O_CREATE|os.O_WRONLY, 0644)
+	if err != nil {
+		retErr = fmt.Errorf(errFileCmdFmt, err)
+		return
+	}
+
+	defer func() {
+		if err := f.Close(); err != nil && retErr == nil {
+			retErr = err
+		}
+	}()
+
+	msg := []byte(fmt.Sprintf("%s=%s\n", name, value))
+	if _, err := f.Write(msg); err != nil {
+		retErr = fmt.Errorf(errFileCmdFmt, err)
+		return
+	}
+	return
+}
+
+func gitRef(gitDir string) (string, error) {
+	cmd := exec.Command("git", "--git-dir", gitDir, "rev-parse", "HEAD")
+	cmd.Stderr = os.Stderr
+	out, err := cmd.Output()
+	if err != nil {
+		return "", fmt.Errorf("failed getting git ref: %w", err)
+	}
+	return strings.TrimRight(string(out), "\r\n"), nil
+}
+
+func rootDir() string {
+	_, currFile, _, _ := runtime.Caller(0)
+	return filepath.Dir(filepath.Dir(currFile))
+}
