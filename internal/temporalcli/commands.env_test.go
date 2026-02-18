@@ -2,6 +2,7 @@ package temporalcli_test
 
 import (
 	"os"
+	"strings"
 	"testing"
 
 	"gopkg.in/yaml.v3"
@@ -69,6 +70,32 @@ func TestEnv_Simple(t *testing.T) {
 	res = h.Execute("env", "list")
 	h.NoError(res.Err)
 	h.NotContains(res.Stdout.String(), "myenv2")
+}
+
+func TestEnv_NoStructuredLogOutput(t *testing.T) {
+	h := NewCommandHarness(t)
+	defer h.Close()
+
+	tmpFile, err := os.CreateTemp("", "")
+	h.NoError(err)
+	h.Options.DeprecatedEnvConfig.EnvConfigFile = tmpFile.Name()
+	defer os.Remove(h.Options.DeprecatedEnvConfig.EnvConfigFile)
+
+	// Successful command: stderr should contain clean messages, not structured logs
+	res := h.Execute("env", "set", "--env", "myenv1", "-k", "foo", "-v", "bar")
+	h.NoError(res.Err)
+	stderr := res.Stderr.String()
+	h.Contains(stderr, `Setting property "foo" to "bar" in env "myenv1"`)
+	for _, banned := range []string{"level=", "time=", "msg="} {
+		if strings.Contains(stderr, banned) {
+			t.Errorf("stderr contains structured log artifact %q: %s", banned, stderr)
+		}
+	}
+
+	// Error case: stderr should be empty (error goes through Fail callback)
+	res = h.Execute("env", "get", "--env", "nonexistent")
+	h.ErrorContains(res.Err, `not found`)
+	h.Empty(res.Stderr.String())
 }
 
 func TestEnv_InputValidation(t *testing.T) {

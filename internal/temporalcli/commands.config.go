@@ -325,7 +325,7 @@ func writeEnvConfigFile(cctx *CommandContext, conf *envconfig.ClientConfig) erro
 	}
 
 	// Write to file, making dirs as needed
-	cctx.Logger.Info("Writing config file", "file", configFile)
+	fmt.Fprintf(cctx.Options.Stderr, "Writing config file %s\n", configFile)
 	if err := os.MkdirAll(filepath.Dir(configFile), 0700); err != nil {
 		return fmt.Errorf("failed making config file parent dirs: %w", err)
 	} else if err := os.WriteFile(configFile, b, 0600); err != nil {
