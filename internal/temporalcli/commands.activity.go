@@ -282,7 +282,17 @@ func pollActivityOutcome(cctx *CommandContext, cl client.Client, namespace, acti
 
 func printActivityResult(cctx *CommandContext, activityID, runID string, result *common.Payloads) error {
 	if cctx.JSONOutput {
-		resultJSON, err := marshalActivityPayloads(cctx, result)
+		var resultJSON json.RawMessage
+		var err error
+		if cctx.JSONShorthandPayloads {
+			var valuePtr any
+			if err = converter.GetDefaultDataConverter().FromPayloads(result, &valuePtr); err != nil {
+				return fmt.Errorf("failed decoding result: %w", err)
+			}
+			resultJSON, err = json.Marshal(valuePtr)
+		} else {
+			resultJSON, err = cctx.MarshalProtoJSON(result)
+		}
 		if err != nil {
 			return fmt.Errorf("failed marshaling result: %w", err)
 		}
@@ -315,17 +325,6 @@ func printActivityResult(cctx *CommandContext, activityID, runID string, result 
 		Status: color.GreenString("COMPLETED"),
 		Result: resultJSON,
 	}, printer.StructuredOptions{})
-}
-
-func marshalActivityPayloads(cctx *CommandContext, payloads *common.Payloads) (json.RawMessage, error) {
-	if cctx.JSONShorthandPayloads {
-		var valuePtr any
-		if err := converter.GetDefaultDataConverter().FromPayloads(payloads, &valuePtr); err != nil {
-			return nil, err
-		}
-		return json.Marshal(valuePtr)
-	}
-	return cctx.MarshalProtoJSON(payloads)
 }
 
 func printActivityFailure(cctx *CommandContext, activityID, runID string, f *failure.Failure) error {

@@ -1215,6 +1215,20 @@ func (s *SharedServerSuite) TestActivity_SearchAttributes_Datetime() {
 	}, 5*time.Second, 200*time.Millisecond)
 }
 
+func (s *SharedServerSuite) TestActivity_SearchAttributes_InvalidKeywordList() {
+	res := s.Execute(
+		"activity", "start",
+		"--activity-id", "sa-invalid-kwlist",
+		"--type", "DevActivity",
+		"--task-queue", s.Worker().Options.TaskQueue,
+		"--start-to-close-timeout", "30s",
+		"--search-attribute", `Foo=[1,"a"]`,
+		"--address", s.Address(),
+	)
+	s.Error(res.Err)
+	s.Contains(res.Err.Error(), "array element 0 is float64, not string")
+}
+
 func (s *SharedServerSuite) TestActivity_List_Pagination() {
 	s.Worker().OnDevActivity(func(ctx context.Context, a any) (any, error) {
 		return "paginated", nil
