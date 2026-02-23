@@ -635,6 +635,73 @@ func (c *TemporalActivityFailCommand) run(cctx *CommandContext, args []string) e
 	return nil
 }
 
+func (c *TemporalActivityHeartbeatCommand) run(cctx *CommandContext, args []string) error {
+	cl, err := dialClient(cctx, &c.Parent.ClientOptions)
+	if err != nil {
+		return err
+	}
+	defer cl.Close()
+
+	var detailPayloads *common.Payloads
+	if len(c.Detail) > 0 {
+		metadata := map[string][][]byte{"encoding": {[]byte("json/plain")}}
+		detailPayloads, err = CreatePayloads([][]byte{[]byte(c.Detail)}, metadata, false)
+		if err != nil {
+			return err
+		}
+	}
+	resp, err := cl.WorkflowService().RecordActivityTaskHeartbeatById(cctx, &workflowservice.RecordActivityTaskHeartbeatByIdRequest{
+		Namespace:  c.Parent.Namespace,
+		WorkflowId: c.WorkflowId,
+		RunId:      c.RunId,
+		ActivityId: c.ActivityId,
+		Details:    detailPayloads,
+		Identity:   c.Parent.Identity,
+	})
+	if err != nil {
+		return fmt.Errorf("unable to record Activity heartbeat: %w", err)
+	}
+	if resp.GetCancelRequested() {
+		cctx.Printer.Println("CancelRequested: true")
+	}
+	if resp.GetActivityPaused() {
+		cctx.Printer.Println("ActivityPaused: true")
+	}
+	if resp.GetActivityReset() {
+		cctx.Printer.Println("ActivityReset: true")
+	}
+	return nil
+}
+
+func (c *TemporalActivityReportCancellationCommand) run(cctx *CommandContext, args []string) error {
+	cl, err := dialClient(cctx, &c.Parent.ClientOptions)
+	if err != nil {
+		return err
+	}
+	defer cl.Close()
+
+	var detailPayloads *common.Payloads
+	if len(c.Detail) > 0 {
+		metadata := map[string][][]byte{"encoding": {[]byte("json/plain")}}
+		detailPayloads, err = CreatePayloads([][]byte{[]byte(c.Detail)}, metadata, false)
+		if err != nil {
+			return err
+		}
+	}
+	_, err = cl.WorkflowService().RespondActivityTaskCanceledById(cctx, &workflowservice.RespondActivityTaskCanceledByIdRequest{
+		Namespace:  c.Parent.Namespace,
+		WorkflowId: c.WorkflowId,
+		RunId:      c.RunId,
+		ActivityId: c.ActivityId,
+		Details:    detailPayloads,
+		Identity:   c.Parent.Identity,
+	})
+	if err != nil {
+		return fmt.Errorf("unable to report Activity cancellation: %w", err)
+	}
+	return nil
+}
+
 func (c *TemporalActivityUpdateOptionsCommand) run(cctx *CommandContext, args []string) error {
 	cl, err := dialClient(cctx, &c.Parent.ClientOptions)
 	if err != nil {

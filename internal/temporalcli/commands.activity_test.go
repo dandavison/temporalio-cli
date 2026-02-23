@@ -117,6 +117,103 @@ func (s *SharedServerSuite) TestActivity_Fail_InvalidDetail() {
 	s.Nil(failed)
 }
 
+func (s *SharedServerSuite) TestActivity_Heartbeat() {
+	run := s.waitActivityStarted()
+	wid := run.GetID()
+	res := s.Execute(
+		"activity", "heartbeat",
+		"--activity-id", activityId,
+		"--workflow-id", wid,
+		"--detail", `{"progress": 50}`,
+		"--address", s.Address(),
+	)
+	s.NoError(res.Err)
+}
+
+func (s *SharedServerSuite) TestActivity_Heartbeat_InvalidDetail() {
+	run := s.waitActivityStarted()
+	res := s.Execute(
+		"activity", "heartbeat",
+		"--activity-id", activityId,
+		"--workflow-id", run.GetID(),
+		"--detail", "{not json}",
+		"--address", s.Address(),
+	)
+	s.ErrorContains(res.Err, "is not valid JSON")
+}
+
+func (s *SharedServerSuite) TestActivity_ReportCancellation() {
+	// Custom workflow that waits for the activity even after cancellation,
+	// so the workflow stays open while we externally report the activity's cancellation.
+	s.Worker().OnDevWorkflow(func(ctx workflow.Context, input any) (any, error) {
+		ctx = workflow.WithActivityOptions(ctx, workflow.ActivityOptions{
+			ActivityID:          activityId,
+			StartToCloseTimeout: 30 * time.Second,
+			WaitForCancellation: true,
+			RetryPolicy:         &temporal.RetryPolicy{MaximumAttempts: 1},
+		})
+		future := workflow.ExecuteActivity(ctx, DevActivity, input)
+		var res any
+		err := future.Get(ctx, &res)
+		if ctx.Err() != nil {
+			newCtx, _ := workflow.NewDisconnectedContext(ctx)
+			err = future.Get(newCtx, &res)
+		}
+		return res, err
+	})
+	s.Worker().OnDevActivity(func(ctx context.Context, a any) (any, error) {
+		time.Sleep(0xFFFF * time.Hour)
+		return nil, nil
+	})
+	run, err := s.Client.ExecuteWorkflow(
+		s.Context,
+		client.StartWorkflowOptions{TaskQueue: s.Worker().Options.TaskQueue},
+		DevWorkflow,
+		"ignored",
+	)
+	s.NoError(err)
+	s.Eventually(func() bool {
+		resp, err := s.Client.DescribeWorkflowExecution(s.Context, run.GetID(), run.GetRunID())
+		s.NoError(err)
+		return len(resp.PendingActivities) > 0
+	}, 5*time.Second, 100*time.Millisecond)
+
+	wid := run.GetID()
+	s.NoError(s.Client.CancelWorkflow(s.Context, wid, run.GetRunID()))
+	s.Eventually(func() bool {
+		resp, err := s.Client.DescribeWorkflowExecution(s.Context, wid, run.GetRunID())
+		if err != nil || len(resp.PendingActivities) == 0 {
+			return false
+		}
+		return resp.PendingActivities[0].State == enums.PENDING_ACTIVITY_STATE_CANCEL_REQUESTED
+	}, 5*time.Second, 100*time.Millisecond)
+
+	res := s.Execute(
+		"activity", "report-cancellation",
+		"--activity-id", activityId,
+		"--workflow-id", wid,
+		"--detail", `{"reason": "user-requested"}`,
+		"--address", s.Address(),
+	)
+	s.NoError(res.Err)
+	err = run.Get(s.Context, nil)
+	s.Error(err)
+	var canceledErr *temporal.CanceledError
+	s.ErrorAs(err, &canceledErr)
+}
+
+func (s *SharedServerSuite) TestActivity_ReportCancellation_InvalidDetail() {
+	run := s.waitActivityStarted()
+	res := s.Execute(
+		"activity", "report-cancellation",
+		"--activity-id", activityId,
+		"--workflow-id", run.GetID(),
+		"--detail", "{not json}",
+		"--address", s.Address(),
+	)
+	s.ErrorContains(res.Err, "is not valid JSON")
+}
+
 func (s *SharedServerSuite) TestActivityOptionsUpdate_Accept() {
 	run := s.waitActivityStarted()
 	wid := run.GetID()
@@ -1037,6 +1134,66 @@ func (s *SharedServerSuite) TestActivity_Fail_ByRunId() {
 	err := handle.Get(s.Context, nil)
 	s.Error(err)
 	s.Contains(err.Error(), "external-failure")
+}
+
+func (s *SharedServerSuite) TestActivity_Heartbeat_ByRunId() {
+	activityStarted := make(chan struct{})
+	s.Worker().OnDevActivity(func(ctx context.Context, a any) (any, error) {
+		close(activityStarted)
+		<-ctx.Done()
+		return nil, ctx.Err()
+	})
+
+	started := s.startActivity("sa-heartbeat-test")
+	runID := started["runId"].(string)
+	<-activityStarted
+
+	res := s.Execute(
+		"activity", "heartbeat",
+		"--activity-id", "sa-heartbeat-test",
+		"--run-id", runID,
+		"--detail", `{"progress": 75}`,
+		"--address", s.Address(),
+	)
+	s.NoError(res.Err)
+}
+
+func (s *SharedServerSuite) TestActivity_ReportCancellation_ByRunId() {
+	activityStarted := make(chan struct{})
+	s.Worker().OnDevActivity(func(ctx context.Context, a any) (any, error) {
+		close(activityStarted)
+		<-ctx.Done()
+		return nil, ctx.Err()
+	})
+
+	started := s.startActivity("sa-cancel-report-test")
+	runID := started["runId"].(string)
+	<-activityStarted
+
+	// Cancel first so the activity reaches CancelRequested state.
+	handle := s.Client.GetActivityHandle(client.GetActivityHandleOptions{
+		ActivityID: "sa-cancel-report-test",
+		RunID:      runID,
+	})
+	s.NoError(handle.Cancel(s.Context, client.CancelActivityOptions{Reason: "setup"}))
+	s.Eventually(func() bool {
+		desc, err := handle.Describe(s.Context, client.DescribeActivityOptions{})
+		return err == nil && desc.RunState.String() == "CancelRequested"
+	}, 5*time.Second, 100*time.Millisecond)
+
+	res := s.Execute(
+		"activity", "report-cancellation",
+		"--activity-id", "sa-cancel-report-test",
+		"--run-id", runID,
+		"--detail", `{"reason": "done"}`,
+		"--address", s.Address(),
+	)
+	s.NoError(res.Err)
+
+	err := handle.Get(s.Context, nil)
+	s.Error(err)
+	var canceledErr *temporal.CanceledError
+	s.ErrorAs(err, &canceledErr)
 }
 
 // No JSON variant: Println outputs the same text regardless of -o json (matches workflow cancel).

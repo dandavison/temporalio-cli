@@ -469,8 +469,10 @@ func NewTemporalActivityCommand(cctx *CommandContext, parent *TemporalCommand) *
 	s.Command.AddCommand(&NewTemporalActivityDescribeCommand(cctx, &s).Command)
 	s.Command.AddCommand(&NewTemporalActivityExecuteCommand(cctx, &s).Command)
 	s.Command.AddCommand(&NewTemporalActivityFailCommand(cctx, &s).Command)
+	s.Command.AddCommand(&NewTemporalActivityHeartbeatCommand(cctx, &s).Command)
 	s.Command.AddCommand(&NewTemporalActivityListCommand(cctx, &s).Command)
 	s.Command.AddCommand(&NewTemporalActivityPauseCommand(cctx, &s).Command)
+	s.Command.AddCommand(&NewTemporalActivityReportCancellationCommand(cctx, &s).Command)
 	s.Command.AddCommand(&NewTemporalActivityResetCommand(cctx, &s).Command)
 	s.Command.AddCommand(&NewTemporalActivityResultCommand(cctx, &s).Command)
 	s.Command.AddCommand(&NewTemporalActivityStartCommand(cctx, &s).Command)
@@ -660,6 +662,37 @@ func NewTemporalActivityFailCommand(cctx *CommandContext, parent *TemporalActivi
 	return &s
 }
 
+type TemporalActivityHeartbeatCommand struct {
+	Parent  *TemporalActivityCommand
+	Command cobra.Command
+	ActivityReferenceOptions
+	WorkflowId string
+	Detail     string
+}
+
+func NewTemporalActivityHeartbeatCommand(cctx *CommandContext, parent *TemporalActivityCommand) *TemporalActivityHeartbeatCommand {
+	var s TemporalActivityHeartbeatCommand
+	s.Parent = parent
+	s.Command.DisableFlagsInUseLine = true
+	s.Command.Use = "heartbeat [flags]"
+	s.Command.Short = "Record a heartbeat for an Activity"
+	if hasHighlighting {
+		s.Command.Long = "Record a heartbeat for an Activity. Heartbeats let the server\nknow the Activity is still making progress. The response\nindicates whether cancellation, pause, or reset has been\nrequested.\n\n\x1b[1mtemporal activity heartbeat \\\n    --activity-id YourActivityId \\\n    --workflow-id YourWorkflowId\x1b[0m"
+	} else {
+		s.Command.Long = "Record a heartbeat for an Activity. Heartbeats let the server\nknow the Activity is still making progress. The response\nindicates whether cancellation, pause, or reset has been\nrequested.\n\n```\ntemporal activity heartbeat \\\n    --activity-id YourActivityId \\\n    --workflow-id YourWorkflowId\n```"
+	}
+	s.Command.Args = cobra.NoArgs
+	s.Command.Flags().StringVarP(&s.WorkflowId, "workflow-id", "w", "", "Workflow ID. Required for workflow Activities. Omit for Standalone Activities.")
+	s.Command.Flags().StringVar(&s.Detail, "detail", "", "Heartbeat detail `JSON`. Stored by the server as the most-recent heartbeat details for this Activity.")
+	s.ActivityReferenceOptions.BuildFlags(s.Command.Flags())
+	s.Command.Run = func(c *cobra.Command, args []string) {
+		if err := s.run(cctx, args); err != nil {
+			cctx.Options.Fail(err)
+		}
+	}
+	return &s
+}
+
 type TemporalActivityListCommand struct {
 	Parent   *TemporalActivityCommand
 	Command  cobra.Command
@@ -716,6 +749,37 @@ func NewTemporalActivityPauseCommand(cctx *CommandContext, parent *TemporalActiv
 	s.Command.Flags().StringVar(&s.ActivityType, "activity-type", "", "All activities of the Activity Type will be paused. Either `activity-id` or `activity-type` must be provided, but not both. Note: Pausing Activity by Type is an experimental feature and may change in the future.")
 	s.Command.Flags().StringVar(&s.Identity, "identity", "", "The identity of the user or client submitting this request.")
 	s.WorkflowReferenceOptions.BuildFlags(s.Command.Flags())
+	s.Command.Run = func(c *cobra.Command, args []string) {
+		if err := s.run(cctx, args); err != nil {
+			cctx.Options.Fail(err)
+		}
+	}
+	return &s
+}
+
+type TemporalActivityReportCancellationCommand struct {
+	Parent  *TemporalActivityCommand
+	Command cobra.Command
+	ActivityReferenceOptions
+	WorkflowId string
+	Detail     string
+}
+
+func NewTemporalActivityReportCancellationCommand(cctx *CommandContext, parent *TemporalActivityCommand) *TemporalActivityReportCancellationCommand {
+	var s TemporalActivityReportCancellationCommand
+	s.Parent = parent
+	s.Command.DisableFlagsInUseLine = true
+	s.Command.Use = "report-cancellation [flags]"
+	s.Command.Short = "Report that an Activity has been cancelled"
+	if hasHighlighting {
+		s.Command.Long = "Report that an Activity has been cancelled. This is the\ncounterpart to \x1b[1mactivity cancel\x1b[0m: after requesting cancellation\nand the Activity acknowledging it, use this command to confirm\nthe cancellation to the server with optional details.\n\n\x1b[1mtemporal activity report-cancellation \\\n    --activity-id YourActivityId \\\n    --workflow-id YourWorkflowId\x1b[0m"
+	} else {
+		s.Command.Long = "Report that an Activity has been cancelled. This is the\ncounterpart to `activity cancel`: after requesting cancellation\nand the Activity acknowledging it, use this command to confirm\nthe cancellation to the server with optional details.\n\n```\ntemporal activity report-cancellation \\\n    --activity-id YourActivityId \\\n    --workflow-id YourWorkflowId\n```"
+	}
+	s.Command.Args = cobra.NoArgs
+	s.Command.Flags().StringVarP(&s.WorkflowId, "workflow-id", "w", "", "Workflow ID. Required for workflow Activities. Omit for Standalone Activities.")
+	s.Command.Flags().StringVar(&s.Detail, "detail", "", "Cancellation detail `JSON`. Attached as the cancellation details payload.")
+	s.ActivityReferenceOptions.BuildFlags(s.Command.Flags())
 	s.Command.Run = func(c *cobra.Command, args []string) {
 		if err := s.run(cctx, args); err != nil {
 			cctx.Options.Fail(err)
