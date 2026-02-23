@@ -180,6 +180,21 @@ func buildStartActivityOptions(opts *ActivityStartOptions) (client.StartActivity
 	return o, nil
 }
 
+// mapToSearchAttributes builds typed search attributes from a map produced by
+// json.Unmarshal into map[string]any. The possible types from json.Unmarshal are:
+//
+//	bool      → NewSearchAttributeKeyBool       (correct for Bool attributes)
+//	float64   → NewSearchAttributeKeyFloat64    (correct for Double; also used for Int,
+//	                                             since JSON has a single number type)
+//	string    → NewSearchAttributeKeyKeyword    (correct for Keyword; also used for Text
+//	                                             and Datetime, since JSON has a single string type)
+//	[]any     → NewSearchAttributeKeyKeywordList (each element must be string)
+//	map[string]any, nil                          → rejected (no corresponding SA type)
+//
+// For inputs where the payload type metadata doesn't match the registered type
+// (Int registered but sent as Float64, Text/Datetime registered but sent as
+// Keyword), the server decodes using its schema, not payload metadata, so these
+// work correctly.
 func mapToSearchAttributes(m map[string]any) (temporal.SearchAttributes, error) {
 	updates := make([]temporal.SearchAttributeUpdate, 0, len(m))
 	for k, v := range m {
@@ -192,8 +207,12 @@ func mapToSearchAttributes(m map[string]any) (temporal.SearchAttributes, error) 
 			updates = append(updates, temporal.NewSearchAttributeKeyBool(k).ValueSet(val))
 		case []any:
 			strs := make([]string, len(val))
-			for i, s := range val {
-				strs[i] = fmt.Sprint(s)
+			for i, elem := range val {
+				s, ok := elem.(string)
+				if !ok {
+					return temporal.SearchAttributes{}, fmt.Errorf("search attribute %q: array element %d is %T, not string", k, i, elem)
+				}
+				strs[i] = s
 			}
 			updates = append(updates, temporal.NewSearchAttributeKeyKeywordList(k).ValueSet(strs))
 		default:

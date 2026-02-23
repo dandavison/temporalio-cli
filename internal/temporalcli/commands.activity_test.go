@@ -1109,29 +1109,84 @@ func (s *SharedServerSuite) TestActivity_SearchAttributes() {
 		return nil, nil
 	})
 
-	// Keyword: uses pre-registered CustomKeywordField
-	uniqueKW := "sa-kw-" + uuid.NewString()[:8]
-	s.startActivity("sa-keyword-test",
-		"--search-attribute", fmt.Sprintf(`CustomKeywordField="%s"`, uniqueKW),
+	for _, sa := range []struct{ name, typ string }{
+		{"SATestBool", "Bool"},
+		{"SATestInt", "Int"},
+		{"SATestDouble", "Double"},
+		{"SATestKeyword", "Keyword"},
+		{"SATestText", "Text"},
+		{"SATestKeywordList", "KeywordList"},
+	} {
+		res := s.Execute(
+			"operator", "search-attribute", "create",
+			"--address", s.Address(),
+			"--name", sa.name,
+			"--type", sa.typ,
+		)
+		s.NoError(res.Err)
+	}
+
+	unique := uuid.NewString()[:8]
+
+	// Bool (JSON bool → NewSearchAttributeKeyBool)
+	s.startActivity("sa-bool-"+unique,
+		"--search-attribute", `SATestBool=true`,
 	)
 	s.Eventually(func() bool {
-		res := s.Execute(
-			"activity", "list",
-			"--address", s.Address(),
-			"--query", fmt.Sprintf(`CustomKeywordField = "%s"`, uniqueKW),
-		)
-		return res.Err == nil && strings.Contains(res.Stdout.String(), "sa-keyword-test")
+		res := s.Execute("activity", "list", "--address", s.Address(),
+			"--query", `SATestBool = true`)
+		return res.Err == nil && strings.Contains(res.Stdout.String(), "sa-bool-"+unique)
 	}, 5*time.Second, 200*time.Millisecond)
 
-	// Verify search attribute field appears in describe JSON
-	res := s.Execute(
-		"activity", "describe",
-		"-o", "json",
-		"--activity-id", "sa-keyword-test",
-		"--address", s.Address(),
+	// Int (JSON number → float64 → sent as Float64; server decodes via schema)
+	s.startActivity("sa-int-"+unique,
+		"--search-attribute", `SATestInt=42`,
 	)
-	s.NoError(res.Err)
-	s.Contains(res.Stdout.String(), "CustomKeywordField")
+	s.Eventually(func() bool {
+		res := s.Execute("activity", "list", "--address", s.Address(),
+			"--query", `SATestInt = 42`)
+		return res.Err == nil && strings.Contains(res.Stdout.String(), "sa-int-"+unique)
+	}, 5*time.Second, 200*time.Millisecond)
+
+	// Double (JSON number → float64 → NewSearchAttributeKeyFloat64)
+	s.startActivity("sa-double-"+unique,
+		"--search-attribute", `SATestDouble=3.14`,
+	)
+	s.Eventually(func() bool {
+		res := s.Execute("activity", "list", "--address", s.Address(),
+			"--query", `SATestDouble = 3.14`)
+		return res.Err == nil && strings.Contains(res.Stdout.String(), "sa-double-"+unique)
+	}, 5*time.Second, 200*time.Millisecond)
+
+	// Keyword (JSON string → NewSearchAttributeKeyKeyword)
+	s.startActivity("sa-keyword-"+unique,
+		"--search-attribute", fmt.Sprintf(`SATestKeyword="kw-%s"`, unique),
+	)
+	s.Eventually(func() bool {
+		res := s.Execute("activity", "list", "--address", s.Address(),
+			"--query", fmt.Sprintf(`SATestKeyword = "kw-%s"`, unique))
+		return res.Err == nil && strings.Contains(res.Stdout.String(), "sa-keyword-"+unique)
+	}, 5*time.Second, 200*time.Millisecond)
+
+	// Text (JSON string → sent as Keyword; server decodes via schema)
+	s.startActivity("sa-text-"+unique,
+		"--search-attribute", fmt.Sprintf(`SATestText="text value %s"`, unique),
+	)
+	s.Eventually(func() bool {
+		res := s.Execute("activity", "list", "--address", s.Address(),
+			"--query", fmt.Sprintf(`SATestText = "text value %s"`, unique))
+		return res.Err == nil && strings.Contains(res.Stdout.String(), "sa-text-"+unique)
+	}, 5*time.Second, 200*time.Millisecond)
+
+	// KeywordList (JSON array → []any → NewSearchAttributeKeyKeywordList)
+	s.startActivity("sa-kwlist-"+unique,
+		"--search-attribute", `SATestKeywordList=["alpha","beta"]`,
+	)
+	s.Eventually(func() bool {
+		res := s.Execute("activity", "list", "--address", s.Address(),
+			"--query", `SATestKeywordList = "alpha"`)
+		return res.Err == nil && strings.Contains(res.Stdout.String(), "sa-kwlist-"+unique)
+	}, 5*time.Second, 200*time.Millisecond)
 }
 
 func (s *SharedServerSuite) TestActivity_SearchAttributes_Datetime() {
