@@ -311,6 +311,34 @@ commands:
         description: |
           Failure reason. Attached as the failure message.
 
+  - name: temporal activity heartbeat
+    summary: Record a heartbeat for an Activity
+    description: |
+      Record a heartbeat for an Activity. Heartbeats let the server
+      know the Activity is still making progress. The response
+      indicates whether cancellation, pause, or reset has been
+      requested.
+
+      ```
+      temporal activity heartbeat \
+          --activity-id YourActivityId \
+          --workflow-id YourWorkflowId
+      ```
+    option-sets:
+      - activity-reference
+    options:
+      - name: workflow-id
+        type: string
+        short: w
+        description: |
+          Workflow ID. Required for workflow Activities.
+          Omit for Standalone Activities.
+      - name: detail
+        type: string
+        description: |
+          Heartbeat detail `JSON`. Stored by the server as the
+          most-recent heartbeat details for this Activity.
+
   - name: temporal activity list
     summary: List Standalone Activities matching a query (Experimental)
     description: |
@@ -654,6 +682,34 @@ commands:
       ```
     option-sets:
       - activity-reference
+
+  - name: temporal activity report-cancellation
+    summary: Report that an Activity has been cancelled
+    description: |
+      Report that an Activity has been cancelled. This is the
+      counterpart to `activity cancel`: after requesting cancellation
+      and the Activity acknowledging it, use this command to confirm
+      the cancellation to the server with optional details.
+
+      ```
+      temporal activity report-cancellation \
+          --activity-id YourActivityId \
+          --workflow-id YourWorkflowId
+      ```
+    option-sets:
+      - activity-reference
+    options:
+      - name: workflow-id
+        type: string
+        short: w
+        description: |
+          Workflow ID. Required for workflow Activities.
+          Omit for Standalone Activities.
+      - name: detail
+        type: string
+        description: |
+          Cancellation detail `JSON`. Attached as the cancellation
+          details payload.
 
   - name: temporal activity start
     summary: Start a new Standalone Activity (Experimental)
