@@ -523,90 +523,6 @@ func (s *SharedServerSuite) TestResetActivity_BatchSuccess() {
 	failActivity.Store(false)
 }
 
-// No JSON variant: command produces no output on success in any mode.
-func (s *SharedServerSuite) TestActivity_Complete_ByRunId() {
-	activityStarted := make(chan struct{})
-	s.Worker().OnDevActivity(func(ctx context.Context, a any) (any, error) {
-		close(activityStarted)
-		<-ctx.Done()
-		return nil, ctx.Err()
-	})
-
-	started := s.startActivity("sa-complete-test")
-	runID := started["runId"].(string)
-	<-activityStarted
-
-	res := s.Execute(
-		"activity", "complete",
-		"--activity-id", "sa-complete-test",
-		"--run-id", runID,
-		"--result", `"completed-externally"`,
-		"--identity", identity,
-		"--address", s.Address(),
-	)
-	s.NoError(res.Err)
-
-	handle := s.Client.GetActivityHandle(client.GetActivityHandleOptions{
-		ActivityID: "sa-complete-test",
-		RunID:      runID,
-	})
-	var actual string
-	s.NoError(handle.Get(s.Context, &actual))
-	s.Equal("completed-externally", actual)
-}
-
-// No JSON variant: command produces no output on success in any mode.
-func (s *SharedServerSuite) TestActivity_Fail_ByRunId() {
-	activityStarted := make(chan struct{})
-	s.Worker().OnDevActivity(func(ctx context.Context, a any) (any, error) {
-		close(activityStarted)
-		<-ctx.Done()
-		return nil, ctx.Err()
-	})
-
-	started := s.startActivity("sa-fail-test")
-	runID := started["runId"].(string)
-	<-activityStarted
-
-	res := s.Execute(
-		"activity", "fail",
-		"--activity-id", "sa-fail-test",
-		"--run-id", runID,
-		"--reason", "external-failure",
-		"--identity", identity,
-		"--address", s.Address(),
-	)
-	s.NoError(res.Err)
-
-	handle := s.Client.GetActivityHandle(client.GetActivityHandleOptions{
-		ActivityID: "sa-fail-test",
-		RunID:      runID,
-	})
-	err := handle.Get(s.Context, nil)
-	s.Error(err)
-	s.Contains(err.Error(), "external-failure")
-}
-
-// startActivity starts an activity via the CLI and returns
-// the parsed JSON response containing activityId and runId.
-func (s *SharedServerSuite) startActivity(activityID string, extraArgs ...string) map[string]any {
-	args := []string{
-		"activity", "start",
-		"-o", "json",
-		"--activity-id", activityID,
-		"--type", "DevActivity",
-		"--task-queue", s.Worker().Options.TaskQueue,
-		"--start-to-close-timeout", "30s",
-		"--address", s.Address(),
-	}
-	args = append(args, extraArgs...)
-	res := s.Execute(args...)
-	s.NoError(res.Err)
-	var jsonOut map[string]any
-	s.NoError(json.Unmarshal(res.Stdout.Bytes(), &jsonOut))
-	return jsonOut
-}
-
 func (s *SharedServerSuite) TestActivity_Start() {
 	s.Worker().OnDevActivity(func(ctx context.Context, a any) (any, error) {
 		return "start-result", nil
@@ -800,6 +716,26 @@ func (s *SharedServerSuite) TestActivity_Execute_RetriesOnEmptyPollResponse() {
 	)
 	s.NoError(res.Err)
 	s.Contains(res.Stdout.String(), "standalone-result")
+}
+
+// startActivity starts an activity via the CLI and returns
+// the parsed JSON response containing activityId and runId.
+func (s *SharedServerSuite) startActivity(activityID string, extraArgs ...string) map[string]any {
+	args := []string{
+		"activity", "start",
+		"-o", "json",
+		"--activity-id", activityID,
+		"--type", "DevActivity",
+		"--task-queue", s.Worker().Options.TaskQueue,
+		"--start-to-close-timeout", "30s",
+		"--address", s.Address(),
+	}
+	args = append(args, extraArgs...)
+	res := s.Execute(args...)
+	s.NoError(res.Err)
+	var jsonOut map[string]any
+	s.NoError(json.Unmarshal(res.Stdout.Bytes(), &jsonOut))
+	return jsonOut
 }
 
 func (s *SharedServerSuite) TestActivity_Result() {
@@ -1037,6 +973,70 @@ func (s *SharedServerSuite) TestActivity_Count() {
 	s.NoError(json.Unmarshal(res.Stdout.Bytes(), &jsonOut))
 	_, ok := jsonOut["count"]
 	s.True(ok)
+}
+
+// No JSON variant: command produces no output on success in any mode.
+func (s *SharedServerSuite) TestActivity_Complete_ByRunId() {
+	activityStarted := make(chan struct{})
+	s.Worker().OnDevActivity(func(ctx context.Context, a any) (any, error) {
+		close(activityStarted)
+		<-ctx.Done()
+		return nil, ctx.Err()
+	})
+
+	started := s.startActivity("sa-complete-test")
+	runID := started["runId"].(string)
+	<-activityStarted
+
+	res := s.Execute(
+		"activity", "complete",
+		"--activity-id", "sa-complete-test",
+		"--run-id", runID,
+		"--result", `"completed-externally"`,
+		"--identity", identity,
+		"--address", s.Address(),
+	)
+	s.NoError(res.Err)
+
+	handle := s.Client.GetActivityHandle(client.GetActivityHandleOptions{
+		ActivityID: "sa-complete-test",
+		RunID:      runID,
+	})
+	var actual string
+	s.NoError(handle.Get(s.Context, &actual))
+	s.Equal("completed-externally", actual)
+}
+
+// No JSON variant: command produces no output on success in any mode.
+func (s *SharedServerSuite) TestActivity_Fail_ByRunId() {
+	activityStarted := make(chan struct{})
+	s.Worker().OnDevActivity(func(ctx context.Context, a any) (any, error) {
+		close(activityStarted)
+		<-ctx.Done()
+		return nil, ctx.Err()
+	})
+
+	started := s.startActivity("sa-fail-test")
+	runID := started["runId"].(string)
+	<-activityStarted
+
+	res := s.Execute(
+		"activity", "fail",
+		"--activity-id", "sa-fail-test",
+		"--run-id", runID,
+		"--reason", "external-failure",
+		"--identity", identity,
+		"--address", s.Address(),
+	)
+	s.NoError(res.Err)
+
+	handle := s.Client.GetActivityHandle(client.GetActivityHandleOptions{
+		ActivityID: "sa-fail-test",
+		RunID:      runID,
+	})
+	err := handle.Get(s.Context, nil)
+	s.Error(err)
+	s.Contains(err.Error(), "external-failure")
 }
 
 // No JSON variant: Println outputs the same text regardless of -o json (matches workflow cancel).
