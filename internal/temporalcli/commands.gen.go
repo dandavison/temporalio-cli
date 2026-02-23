@@ -495,9 +495,9 @@ func NewTemporalActivityCancelCommand(cctx *CommandContext, parent *TemporalActi
 	s.Command.Use = "cancel [flags]"
 	s.Command.Short = "Request cancellation of a Standalone Activity (Experimental)"
 	if hasHighlighting {
-		s.Command.Long = "Request cancellation of a Standalone Activity Execution.\n\n\x1b[1mtemporal activity cancel \\\n    --activity-id YourActivityId\x1b[0m\n\nRequesting cancellation transitions the Activity's run state\nto CancelRequested. If the Activity is heartbeating, a\ncancellation error will be raised when the next heartbeat\nresponse is received; if the Activity allows this error to\npropagate, the Activity transitions to canceled status."
+		s.Command.Long = "Request cancellation of a Standalone Activity.\n\n\x1b[1mtemporal activity cancel \\\n    --activity-id YourActivityId\x1b[0m\n\nRequesting cancellation transitions the Activity's run state\nto CancelRequested. If the Activity is heartbeating, a\ncancellation error will be raised when the next heartbeat\nresponse is received; if the Activity allows this error to\npropagate, the Activity transitions to canceled status."
 	} else {
-		s.Command.Long = "Request cancellation of a Standalone Activity Execution.\n\n```\ntemporal activity cancel \\\n    --activity-id YourActivityId\n```\n\nRequesting cancellation transitions the Activity's run state\nto CancelRequested. If the Activity is heartbeating, a\ncancellation error will be raised when the next heartbeat\nresponse is received; if the Activity allows this error to\npropagate, the Activity transitions to canceled status."
+		s.Command.Long = "Request cancellation of a Standalone Activity.\n\n```\ntemporal activity cancel \\\n    --activity-id YourActivityId\n```\n\nRequesting cancellation transitions the Activity's run state\nto CancelRequested. If the Activity is heartbeating, a\ncancellation error will be raised when the next heartbeat\nresponse is received; if the Activity allows this error to\npropagate, the Activity transitions to canceled status."
 	}
 	s.Command.Args = cobra.NoArgs
 	s.Command.Flags().StringVar(&s.Reason, "reason", "", "Reason for cancellation.")
@@ -555,9 +555,9 @@ func NewTemporalActivityCountCommand(cctx *CommandContext, parent *TemporalActiv
 	s.Command.Use = "count [flags]"
 	s.Command.Short = "Count Standalone Activities matching a query (Experimental)"
 	if hasHighlighting {
-		s.Command.Long = "Return a count of Standalone Activity Executions. Use \x1b[1m--query\x1b[0m to filter\nthe activities to be counted.\n\n\x1b[1mtemporal activity count \\\n    --query 'ActivityType=\"YourActivity\"'\x1b[0m\n\nVisit https://docs.temporal.io/visibility to read more about\nSearch Attributes and queries."
+		s.Command.Long = "Return a count of Standalone Activities. Use \x1b[1m--query\x1b[0m to filter\nthe activities to be counted.\n\n\x1b[1mtemporal activity count \\\n    --query 'ActivityType=\"YourActivity\"'\x1b[0m\n\nVisit https://docs.temporal.io/visibility to read more about\nSearch Attributes and queries."
 	} else {
-		s.Command.Long = "Return a count of Standalone Activity Executions. Use `--query` to filter\nthe activities to be counted.\n\n```\ntemporal activity count \\\n    --query 'ActivityType=\"YourActivity\"'\n```\n\nVisit https://docs.temporal.io/visibility to read more about\nSearch Attributes and queries."
+		s.Command.Long = "Return a count of Standalone Activities. Use `--query` to filter\nthe activities to be counted.\n\n```\ntemporal activity count \\\n    --query 'ActivityType=\"YourActivity\"'\n```\n\nVisit https://docs.temporal.io/visibility to read more about\nSearch Attributes and queries."
 	}
 	s.Command.Args = cobra.NoArgs
 	s.Command.Flags().StringVarP(&s.Query, "query", "q", "", "Query to filter Activity Executions to count.")
@@ -583,9 +583,9 @@ func NewTemporalActivityDescribeCommand(cctx *CommandContext, parent *TemporalAc
 	s.Command.Use = "describe [flags]"
 	s.Command.Short = "Show detailed info for a Standalone Activity (Experimental)"
 	if hasHighlighting {
-		s.Command.Long = "Display information about a Standalone Activity Execution.\n\n\x1b[1mtemporal activity describe \\\n    --activity-id YourActivityId\x1b[0m"
+		s.Command.Long = "Display information about a Standalone Activity.\n\n\x1b[1mtemporal activity describe \\\n    --activity-id YourActivityId\x1b[0m"
 	} else {
-		s.Command.Long = "Display information about a Standalone Activity Execution.\n\n```\ntemporal activity describe \\\n    --activity-id YourActivityId\n```"
+		s.Command.Long = "Display information about a Standalone Activity.\n\n```\ntemporal activity describe \\\n    --activity-id YourActivityId\n```"
 	}
 	s.Command.Args = cobra.NoArgs
 	s.Command.Flags().BoolVar(&s.Raw, "raw", false, "Print properties without changing their format.")
@@ -612,9 +612,9 @@ func NewTemporalActivityExecuteCommand(cctx *CommandContext, parent *TemporalAct
 	s.Command.Use = "execute [flags]"
 	s.Command.Short = "Start a new Standalone Activity and wait for its result (Experimental)"
 	if hasHighlighting {
-		s.Command.Long = "Start a new Standalone Activity Execution and block until it completes.\nThe result is output to stdout.\n\n\x1b[1mtemporal activity execute \\\n    --activity-id YourActivityId \\\n    --type YourActivity \\\n    --task-queue YourTaskQueue \\\n    --start-to-close-timeout 30s \\\n    --input '{\"some-key\": \"some-value\"}'\x1b[0m"
+		s.Command.Long = "Start a new Standalone Activity and block until it completes.\nThe result is output to stdout.\n\n\x1b[1mtemporal activity execute \\\n    --activity-id YourActivityId \\\n    --type YourActivity \\\n    --task-queue YourTaskQueue \\\n    --start-to-close-timeout 30s \\\n    --input '{\"some-key\": \"some-value\"}'\x1b[0m"
 	} else {
-		s.Command.Long = "Start a new Standalone Activity Execution and block until it completes.\nThe result is output to stdout.\n\n```\ntemporal activity execute \\\n    --activity-id YourActivityId \\\n    --type YourActivity \\\n    --task-queue YourTaskQueue \\\n    --start-to-close-timeout 30s \\\n    --input '{\"some-key\": \"some-value\"}'\n```"
+		s.Command.Long = "Start a new Standalone Activity and block until it completes.\nThe result is output to stdout.\n\n```\ntemporal activity execute \\\n    --activity-id YourActivityId \\\n    --type YourActivity \\\n    --task-queue YourTaskQueue \\\n    --start-to-close-timeout 30s \\\n    --input '{\"some-key\": \"some-value\"}'\n```"
 	}
 	s.Command.Args = cobra.NoArgs
 	s.ActivityStartOptions.BuildFlags(s.Command.Flags())
@@ -675,9 +675,9 @@ func NewTemporalActivityListCommand(cctx *CommandContext, parent *TemporalActivi
 	s.Command.Use = "list [flags]"
 	s.Command.Short = "List Standalone Activities matching a query (Experimental)"
 	if hasHighlighting {
-		s.Command.Long = "List Standalone Activity Executions. Use \x1b[1m--query\x1b[0m to filter results.\n\n\x1b[1mtemporal activity list \\\n    --query 'ActivityType=\"YourActivity\"'\x1b[0m\n\nVisit https://docs.temporal.io/visibility to read more about\nSearch Attributes and queries."
+		s.Command.Long = "List Standalone Activities. Use \x1b[1m--query\x1b[0m to filter results.\n\n\x1b[1mtemporal activity list \\\n    --query 'ActivityType=\"YourActivity\"'\x1b[0m\n\nVisit https://docs.temporal.io/visibility to read more about\nSearch Attributes and queries."
 	} else {
-		s.Command.Long = "List Standalone Activity Executions. Use `--query` to filter results.\n\n```\ntemporal activity list \\\n    --query 'ActivityType=\"YourActivity\"'\n```\n\nVisit https://docs.temporal.io/visibility to read more about\nSearch Attributes and queries."
+		s.Command.Long = "List Standalone Activities. Use `--query` to filter results.\n\n```\ntemporal activity list \\\n    --query 'ActivityType=\"YourActivity\"'\n```\n\nVisit https://docs.temporal.io/visibility to read more about\nSearch Attributes and queries."
 	}
 	s.Command.Args = cobra.NoArgs
 	s.Command.Flags().StringVarP(&s.Query, "query", "q", "", "Query to filter the Activity Executions to list.")
@@ -781,9 +781,9 @@ func NewTemporalActivityResultCommand(cctx *CommandContext, parent *TemporalActi
 	s.Command.Use = "result [flags]"
 	s.Command.Short = "Wait for and output the result of a Standalone Activity (Experimental)"
 	if hasHighlighting {
-		s.Command.Long = "Wait for a Standalone Activity Execution to complete and output the\nresult.\n\n\x1b[1mtemporal activity result \\\n    --activity-id YourActivityId\x1b[0m"
+		s.Command.Long = "Wait for a Standalone Activity to complete and output the\nresult.\n\n\x1b[1mtemporal activity result \\\n    --activity-id YourActivityId\x1b[0m"
 	} else {
-		s.Command.Long = "Wait for a Standalone Activity Execution to complete and output the\nresult.\n\n```\ntemporal activity result \\\n    --activity-id YourActivityId\n```"
+		s.Command.Long = "Wait for a Standalone Activity to complete and output the\nresult.\n\n```\ntemporal activity result \\\n    --activity-id YourActivityId\n```"
 	}
 	s.Command.Args = cobra.NoArgs
 	s.ActivityReferenceOptions.BuildFlags(s.Command.Flags())
@@ -809,9 +809,9 @@ func NewTemporalActivityStartCommand(cctx *CommandContext, parent *TemporalActiv
 	s.Command.Use = "start [flags]"
 	s.Command.Short = "Start a new Standalone Activity (Experimental)"
 	if hasHighlighting {
-		s.Command.Long = "Start a new Standalone Activity Execution. Outputs the Activity ID and\nRun ID.\n\n\x1b[1mtemporal activity start \\\n    --activity-id YourActivityId \\\n    --type YourActivity \\\n    --task-queue YourTaskQueue \\\n    --schedule-to-close-timeout 5m \\\n    --input '{\"some-key\": \"some-value\"}'\x1b[0m"
+		s.Command.Long = "Start a new Standalone Activity. Outputs the Activity ID and\nRun ID.\n\n\x1b[1mtemporal activity start \\\n    --activity-id YourActivityId \\\n    --type YourActivity \\\n    --task-queue YourTaskQueue \\\n    --schedule-to-close-timeout 5m \\\n    --input '{\"some-key\": \"some-value\"}'\x1b[0m"
 	} else {
-		s.Command.Long = "Start a new Standalone Activity Execution. Outputs the Activity ID and\nRun ID.\n\n```\ntemporal activity start \\\n    --activity-id YourActivityId \\\n    --type YourActivity \\\n    --task-queue YourTaskQueue \\\n    --schedule-to-close-timeout 5m \\\n    --input '{\"some-key\": \"some-value\"}'\n```"
+		s.Command.Long = "Start a new Standalone Activity. Outputs the Activity ID and\nRun ID.\n\n```\ntemporal activity start \\\n    --activity-id YourActivityId \\\n    --type YourActivity \\\n    --task-queue YourTaskQueue \\\n    --schedule-to-close-timeout 5m \\\n    --input '{\"some-key\": \"some-value\"}'\n```"
 	}
 	s.Command.Args = cobra.NoArgs
 	s.ActivityStartOptions.BuildFlags(s.Command.Flags())
@@ -838,9 +838,9 @@ func NewTemporalActivityTerminateCommand(cctx *CommandContext, parent *TemporalA
 	s.Command.Use = "terminate [flags]"
 	s.Command.Short = "Forcefully end a Standalone Activity (Experimental)"
 	if hasHighlighting {
-		s.Command.Long = "Terminate a Standalone Activity Execution.\n\n\x1b[1mtemporal activity terminate \\\n    --activity-id YourActivityId \\\n    --reason YourReason\x1b[0m\n\nActivity code cannot see or respond to terminations. To\nperform clean-up work, use \x1b[1mtemporal activity cancel\x1b[0m instead."
+		s.Command.Long = "Terminate a Standalone Activity.\n\n\x1b[1mtemporal activity terminate \\\n    --activity-id YourActivityId \\\n    --reason YourReason\x1b[0m\n\nActivity code cannot see or respond to terminations. To\nperform clean-up work, use \x1b[1mtemporal activity cancel\x1b[0m instead."
 	} else {
-		s.Command.Long = "Terminate a Standalone Activity Execution.\n\n```\ntemporal activity terminate \\\n    --activity-id YourActivityId \\\n    --reason YourReason\n```\n\nActivity code cannot see or respond to terminations. To\nperform clean-up work, use `temporal activity cancel` instead."
+		s.Command.Long = "Terminate a Standalone Activity.\n\n```\ntemporal activity terminate \\\n    --activity-id YourActivityId \\\n    --reason YourReason\n```\n\nActivity code cannot see or respond to terminations. To\nperform clean-up work, use `temporal activity cancel` instead."
 	}
 	s.Command.Args = cobra.NoArgs
 	s.Command.Flags().StringVar(&s.Reason, "reason", "", "Reason for termination. Defaults to a message with the current user's name.")

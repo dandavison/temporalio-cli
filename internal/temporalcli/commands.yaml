@@ -183,7 +183,7 @@ commands:
   - name: temporal activity cancel
     summary: Request cancellation of a Standalone Activity (Experimental)
     description: |
-      Request cancellation of a Standalone Activity Execution.
+      Request cancellation of a Standalone Activity.
 
       ```
       temporal activity cancel \
@@ -231,7 +231,7 @@ commands:
   - name: temporal activity count
     summary: Count Standalone Activities matching a query (Experimental)
     description: |
-      Return a count of Standalone Activity Executions. Use `--query` to filter
+      Return a count of Standalone Activities. Use `--query` to filter
       the activities to be counted.
 
       ```
@@ -251,7 +251,7 @@ commands:
   - name: temporal activity describe
     summary: Show detailed info for a Standalone Activity (Experimental)
     description: |
-      Display information about a Standalone Activity Execution.
+      Display information about a Standalone Activity.
 
       ```
       temporal activity describe \
@@ -267,7 +267,7 @@ commands:
   - name: temporal activity execute
     summary: Start a new Standalone Activity and wait for its result (Experimental)
     description: |
-      Start a new Standalone Activity Execution and block until it completes.
+      Start a new Standalone Activity and block until it completes.
       The result is output to stdout.
 
       ```
@@ -314,7 +314,7 @@ commands:
   - name: temporal activity list
     summary: List Standalone Activities matching a query (Experimental)
     description: |
-      List Standalone Activity Executions. Use `--query` to filter results.
+      List Standalone Activities. Use `--query` to filter results.
 
       ```
       temporal activity list \
@@ -645,7 +645,7 @@ commands:
   - name: temporal activity result
     summary: Wait for and output the result of a Standalone Activity (Experimental)
     description: |
-      Wait for a Standalone Activity Execution to complete and output the
+      Wait for a Standalone Activity to complete and output the
       result.
 
       ```
@@ -658,7 +658,7 @@ commands:
   - name: temporal activity start
     summary: Start a new Standalone Activity (Experimental)
     description: |
-      Start a new Standalone Activity Execution. Outputs the Activity ID and
+      Start a new Standalone Activity. Outputs the Activity ID and
       Run ID.
 
       ```
@@ -676,7 +676,7 @@ commands:
   - name: temporal activity terminate
     summary: Forcefully end a Standalone Activity (Experimental)
     description: |
-      Terminate a Standalone Activity Execution.
+      Terminate a Standalone Activity.
 
       ```
       temporal activity terminate \
