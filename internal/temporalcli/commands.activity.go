@@ -236,7 +236,10 @@ func getActivityResult(cctx *CommandContext, cl client.Client, namespace, activi
 	case *activitypb.ActivityExecutionOutcome_Result:
 		return printActivityResult(cctx, activityID, runID, v.Result)
 	case *activitypb.ActivityExecutionOutcome_Failure:
-		return printActivityFailure(cctx, activityID, runID, v.Failure)
+		if err := printActivityFailure(cctx, activityID, runID, v.Failure); err != nil {
+			cctx.Logger.Error("Activity failed, and printing the output also failed", "error", err)
+		}
+		return fmt.Errorf("activity failed")
 	default:
 		return fmt.Errorf("unexpected activity outcome type: %T", v)
 	}
@@ -344,7 +347,7 @@ func printActivityFailure(cctx *CommandContext, activityID, runID string, f *fai
 			Status:     "FAILED",
 			Failure:    failureJSON,
 		}, printer.StructuredOptions{})
-		return fmt.Errorf("activity failed")
+		return nil
 	}
 
 	cctx.Printer.Println(color.MagentaString("Results:"))
@@ -355,7 +358,7 @@ func printActivityFailure(cctx *CommandContext, activityID, runID string, f *fai
 		Status:  color.RedString("FAILED"),
 		Failure: cctx.MarshalFriendlyFailureBodyText(f, "    "),
 	}, printer.StructuredOptions{})
-	return fmt.Errorf("activity failed")
+	return nil
 }
 
 func (c *TemporalActivityDescribeCommand) run(cctx *CommandContext, args []string) error {
