@@ -684,8 +684,7 @@ commands:
           --reason YourReason
       ```
 
-      Activity code cannot see or respond to terminations. To
-      perform clean-up work, use `temporal activity cancel` instead.
+      Activity code cannot see or respond to terminations.
     option-sets:
       - activity-reference
     options:
@@ -4928,7 +4927,9 @@ option-sets:
       - name: activity-id
         type: string
         short: a
-        description: Activity ID.
+        description: |
+          Activity ID. This may be the ID of an Activity invoked by a Workflow, or of a Standalone
+          Activity.
         required: true
       - name: run-id
         type: string
@@ -4942,7 +4943,9 @@ option-sets:
       - name: activity-id
         type: string
         short: a
-        description: Activity ID.
+        description: |
+          Activity ID. This may be the ID of an Activity invoked by a Workflow, or of a Standalone
+          Activity.
         required: true
       - name: type
         type: string

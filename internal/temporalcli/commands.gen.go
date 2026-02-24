@@ -356,7 +356,7 @@ type ActivityReferenceOptions struct {
 
 func (v *ActivityReferenceOptions) BuildFlags(f *pflag.FlagSet) {
 	v.FlagSet = f
-	f.StringVarP(&v.ActivityId, "activity-id", "a", "", "Activity ID. Required.")
+	f.StringVarP(&v.ActivityId, "activity-id", "a", "", "Activity ID. This may be the ID of an Activity invoked by a Workflow, or of a Standalone Activity. Required.")
 	_ = cobra.MarkFlagRequired(f, "activity-id")
 	f.StringVarP(&v.RunId, "run-id", "r", "", "Run ID. If not set, targets the latest run.")
 }
@@ -387,7 +387,7 @@ type ActivityStartOptions struct {
 
 func (v *ActivityStartOptions) BuildFlags(f *pflag.FlagSet) {
 	v.FlagSet = f
-	f.StringVarP(&v.ActivityId, "activity-id", "a", "", "Activity ID. Required.")
+	f.StringVarP(&v.ActivityId, "activity-id", "a", "", "Activity ID. This may be the ID of an Activity invoked by a Workflow, or of a Standalone Activity. Required.")
 	_ = cobra.MarkFlagRequired(f, "activity-id")
 	f.StringVar(&v.Type, "type", "", "Activity Type name. Required.")
 	_ = cobra.MarkFlagRequired(f, "type")
@@ -838,9 +838,9 @@ func NewTemporalActivityTerminateCommand(cctx *CommandContext, parent *TemporalA
 	s.Command.Use = "terminate [flags]"
 	s.Command.Short = "Forcefully end a Standalone Activity (Experimental)"
 	if hasHighlighting {
-		s.Command.Long = "Terminate a Standalone Activity.\n\n\x1b[1mtemporal activity terminate \\\n    --activity-id YourActivityId \\\n    --reason YourReason\x1b[0m\n\nActivity code cannot see or respond to terminations. To\nperform clean-up work, use \x1b[1mtemporal activity cancel\x1b[0m instead."
+		s.Command.Long = "Terminate a Standalone Activity.\n\n\x1b[1mtemporal activity terminate \\\n    --activity-id YourActivityId \\\n    --reason YourReason\x1b[0m\n\nActivity code cannot see or respond to terminations."
 	} else {
-		s.Command.Long = "Terminate a Standalone Activity.\n\n```\ntemporal activity terminate \\\n    --activity-id YourActivityId \\\n    --reason YourReason\n```\n\nActivity code cannot see or respond to terminations. To\nperform clean-up work, use `temporal activity cancel` instead."
+		s.Command.Long = "Terminate a Standalone Activity.\n\n```\ntemporal activity terminate \\\n    --activity-id YourActivityId \\\n    --reason YourReason\n```\n\nActivity code cannot see or respond to terminations."
 	}
 	s.Command.Args = cobra.NoArgs
 	s.Command.Flags().StringVar(&s.Reason, "reason", "", "Reason for termination. Defaults to a message with the current user's name.")
