@@ -67,7 +67,7 @@ func (c *TemporalActivityExecuteCommand) run(cctx *CommandContext, args []string
 	}
 	if !cctx.JSONOutput {
 		if err := printActivityExecution(cctx, c.ActivityId, handle.GetRunID(), c.Type, c.Parent.Namespace, c.TaskQueue); err != nil {
-			cctx.Logger.Error("Failed printing execution info", "error", err)
+			fmt.Fprintf(cctx.Options.Stderr, "Warning: printing execution info failed: %v\n", err)
 		}
 	}
 	return getActivityResult(cctx, cl, c.Parent.Namespace, c.ActivityId, handle.GetRunID())
@@ -237,7 +237,7 @@ func getActivityResult(cctx *CommandContext, cl client.Client, namespace, activi
 		return printActivityResult(cctx, activityID, runID, v.Result)
 	case *activitypb.ActivityExecutionOutcome_Failure:
 		if err := printActivityFailure(cctx, activityID, runID, v.Failure); err != nil {
-			cctx.Logger.Error("Activity failed, and printing the output also failed", "error", err)
+			fmt.Fprintf(cctx.Options.Stderr, "Warning: printing activity output failed: %v\n", err)
 		}
 		return fmt.Errorf("activity failed")
 	default:
