@@ -666,7 +666,7 @@ commands:
           --activity-id YourActivityId \
           --type YourActivity \
           --task-queue YourTaskQueue \
-          --schedule-to-close-timeout 5m \
+          --start-to-close-timeout 5m \
           --input '{"some-key": "some-value"}'
       ```
     option-sets:
