@@ -30,7 +30,10 @@ require (
 	modernc.org/sqlite v1.39.1
 )
 
-replace github.com/temporalio/cli/cliext => ./cliext
+replace (
+	github.com/temporalio/cli/cliext => ./cliext
+	go.temporal.io/sdk => github.com/dandavison/temporalio-sdk-go v1.25.2-0.20260219171002-42df27d0602c
+)
 
 require (
 	cel.dev/expr v0.23.1 // indirect
