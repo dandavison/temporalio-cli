@@ -200,6 +200,11 @@ func (b *ClientOptionsBuilder) Build(ctx context.Context) (client.Options, error
 		return client.Options{}, fmt.Errorf("failed to build client options: %w", err)
 	}
 
+	// TODO(dan): Remove once envconfig sets TLSDisabled itself.
+	if profile.TLS != nil && profile.TLS.Disabled {
+		clientOpts.ConnectionOptions.TLSDisabled = true
+	}
+
 	// Set client authority if provided.
 	if cfg.ClientAuthority != "" {
 		clientOpts.ConnectionOptions.Authority = cfg.ClientAuthority
