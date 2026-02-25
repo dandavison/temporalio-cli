@@ -97,6 +97,10 @@ func startActivity(
 	if err != nil {
 		return nil, err
 	}
+	cctx.Context, err = contextWithHeaders(cctx.Context, opts.Headers)
+	if err != nil {
+		return nil, err
+	}
 	handle, err := cl.ExecuteActivity(cctx, startOpts, opts.Type, input...)
 	if err != nil {
 		return nil, fmt.Errorf("failed starting activity: %w", err)
