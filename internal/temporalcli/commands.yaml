@@ -5046,13 +5046,6 @@ option-sets:
           JSON values.
           Can be passed multiple times.
           See https://docs.temporal.io/visibility.
-      - name: headers
-        type: string[]
-        description: |
-          Temporal activity headers in 'KEY=VALUE' format.
-          Keys must be identifiers, and values must be
-          JSON values.
-          May be passed multiple times.
       - name: static-summary
         type: string
         experimental: true

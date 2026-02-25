@@ -376,7 +376,6 @@ type ActivityStartOptions struct {
 	IdReusePolicy           cliext.FlagStringEnum
 	IdConflictPolicy        cliext.FlagStringEnum
 	SearchAttribute         []string
-	Headers                 []string
 	StaticSummary           string
 	StaticDetails           string
 	PriorityKey             int
@@ -391,16 +390,16 @@ func (v *ActivityStartOptions) BuildFlags(f *pflag.FlagSet) {
 	_ = cobra.MarkFlagRequired(f, "activity-id")
 	f.StringVar(&v.Type, "type", "", "Activity Type name. Required.")
 	_ = cobra.MarkFlagRequired(f, "type")
-	f.StringVarP(&v.TaskQueue, "task-queue", "t", "", "Activity Task queue. Required.")
+	f.StringVarP(&v.TaskQueue, "task-queue", "t", "", "Activity task queue. Required.")
 	_ = cobra.MarkFlagRequired(f, "task-queue")
 	v.ScheduleToCloseTimeout = 0
 	f.Var(&v.ScheduleToCloseTimeout, "schedule-to-close-timeout", "Maximum time for the Activity Execution, including all retries. Either this or \"start-to-close-timeout\" is required.")
 	v.ScheduleToStartTimeout = 0
-	f.Var(&v.ScheduleToStartTimeout, "schedule-to-start-timeout", "Maximum time an Activity task can stay in a task queue before a Worker picks it up.")
+	f.Var(&v.ScheduleToStartTimeout, "schedule-to-start-timeout", "Maximum time an Activity task can stay in a task queue before a Worker picks it up. On expiry it results in a non-retryable failure and no further attempts are scheduled.")
 	v.StartToCloseTimeout = 0
-	f.Var(&v.StartToCloseTimeout, "start-to-close-timeout", "Maximum time for a single Activity attempt. Either this or \"schedule-to-close-timeout\" is required.")
+	f.Var(&v.StartToCloseTimeout, "start-to-close-timeout", "Maximum time for a single Activity attempt. On expiry a new attempt may be scheduled if permitted by the retry policy and schedule-to-close timeout. Either this or \"schedule-to-close-timeout\" is required.")
 	v.HeartbeatTimeout = 0
-	f.Var(&v.HeartbeatTimeout, "heartbeat-timeout", "Maximum time between successful Worker heartbeats.")
+	f.Var(&v.HeartbeatTimeout, "heartbeat-timeout", "Maximum time between successful Worker heartbeats. On expiry the current activity attempt fails.")
 	v.RetryInitialInterval = 0
 	f.Var(&v.RetryInitialInterval, "retry-initial-interval", "Interval of the first retry. If \"retry-backoff-coefficient\" is 1.0, it is used for all retries.")
 	v.RetryMaximumInterval = 0
@@ -412,7 +411,6 @@ func (v *ActivityStartOptions) BuildFlags(f *pflag.FlagSet) {
 	v.IdConflictPolicy = cliext.NewFlagStringEnum([]string{"Fail", "UseExisting"}, "")
 	f.Var(&v.IdConflictPolicy, "id-conflict-policy", "Policy for handling activity start when an Activity with the same ID is currently running. Accepted values: Fail, UseExisting.")
 	f.StringArrayVar(&v.SearchAttribute, "search-attribute", nil, "Search Attribute in `KEY=VALUE` format. Keys must be identifiers, and values must be JSON values. Can be passed multiple times. See https://docs.temporal.io/visibility.")
-	f.StringArrayVar(&v.Headers, "headers", nil, "Temporal activity headers in 'KEY=VALUE' format. Keys must be identifiers, and values must be JSON values. May be passed multiple times.")
 	f.StringVar(&v.StaticSummary, "static-summary", "", "Static Activity summary for human consumption in UIs. Uses standard Markdown formatting excluding images, HTML, and script tags. EXPERIMENTAL.")
 	f.StringVar(&v.StaticDetails, "static-details", "", "Static Activity details for human consumption in UIs. Uses standard Markdown formatting excluding images, HTML, and script tags. EXPERIMENTAL.")
 	f.IntVar(&v.PriorityKey, "priority-key", 0, "Priority key (1-5, lower = higher priority). Default is 3 when not specified.")
@@ -815,9 +813,9 @@ func NewTemporalActivityStartCommand(cctx *CommandContext, parent *TemporalActiv
 	s.Command.Use = "start [flags]"
 	s.Command.Short = "Start a new Standalone Activity (Experimental)"
 	if hasHighlighting {
-		s.Command.Long = "Start a new Standalone Activity. Outputs the Activity ID and\nRun ID.\n\n\x1b[1mtemporal activity start \\\n    --activity-id YourActivityId \\\n    --type YourActivity \\\n    --task-queue YourTaskQueue \\\n    --schedule-to-close-timeout 5m \\\n    --input '{\"some-key\": \"some-value\"}'\x1b[0m"
+		s.Command.Long = "Start a new Standalone Activity. Outputs the Activity ID and\nRun ID.\n\n\x1b[1mtemporal activity start \\\n    --activity-id YourActivityId \\\n    --type YourActivity \\\n    --task-queue YourTaskQueue \\\n    --start-to-close-timeout 5m \\\n    --input '{\"some-key\": \"some-value\"}'\x1b[0m"
 	} else {
-		s.Command.Long = "Start a new Standalone Activity. Outputs the Activity ID and\nRun ID.\n\n```\ntemporal activity start \\\n    --activity-id YourActivityId \\\n    --type YourActivity \\\n    --task-queue YourTaskQueue \\\n    --schedule-to-close-timeout 5m \\\n    --input '{\"some-key\": \"some-value\"}'\n```"
+		s.Command.Long = "Start a new Standalone Activity. Outputs the Activity ID and\nRun ID.\n\n```\ntemporal activity start \\\n    --activity-id YourActivityId \\\n    --type YourActivity \\\n    --task-queue YourTaskQueue \\\n    --start-to-close-timeout 5m \\\n    --input '{\"some-key\": \"some-value\"}'\n```"
 	}
 	s.Command.Args = cobra.NoArgs
 	s.ActivityStartOptions.BuildFlags(s.Command.Flags())
