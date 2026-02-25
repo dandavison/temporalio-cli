@@ -15,6 +15,7 @@ import (
 	"go.temporal.io/api/serviceerror"
 	"go.temporal.io/api/workflowservice/v1"
 	"go.temporal.io/sdk/client"
+	"go.temporal.io/sdk/converter"
 	"go.temporal.io/sdk/temporal"
 	"go.temporal.io/sdk/workflow"
 	"google.golang.org/grpc"
@@ -563,6 +564,50 @@ func (s *SharedServerSuite) TestActivity_Start() {
 	s.Equal("DevActivity", jsonOut["type"])
 	s.Equal("default", jsonOut["namespace"])
 	s.NotEmpty(jsonOut["taskQueue"])
+}
+
+func (s *SharedServerSuite) TestActivity_Start_With_Headers() {
+	s.Worker().OnDevActivity(func(ctx context.Context, a any) (any, error) {
+		return nil, nil
+	})
+
+	var capturedHeader *workflowservice.StartActivityExecutionRequest
+	var mu sync.Mutex
+	s.CommandHarness.Options.AdditionalClientGRPCDialOptions = append(
+		s.CommandHarness.Options.AdditionalClientGRPCDialOptions,
+		grpc.WithChainUnaryInterceptor(func(
+			ctx context.Context,
+			method string, req, reply any,
+			cc *grpc.ClientConn, invoker grpc.UnaryInvoker, opts ...grpc.CallOption,
+		) error {
+			if startReq, ok := req.(*workflowservice.StartActivityExecutionRequest); ok {
+				mu.Lock()
+				capturedHeader = startReq
+				mu.Unlock()
+			}
+			return invoker(ctx, method, req, reply, cc, opts...)
+		}),
+	)
+
+	res := s.Execute(
+		"activity", "start",
+		"--activity-id", "header-test",
+		"--type", "DevActivity",
+		"--task-queue", s.Worker().Options.TaskQueue,
+		"--start-to-close-timeout", "30s",
+		"--headers", "id=123",
+		"--address", s.Address(),
+	)
+	s.NoError(res.Err)
+
+	mu.Lock()
+	defer mu.Unlock()
+	s.NotNil(capturedHeader)
+	payload := capturedHeader.Header.Fields["id"]
+	s.NotNil(payload)
+	var val int
+	s.NoError(converter.GetDefaultDataConverter().FromPayload(payload, &val))
+	s.Equal(123, val)
 }
 
 func (s *SharedServerSuite) TestActivity_Execute_Success() {
