@@ -4984,17 +4984,22 @@ option-sets:
         type: duration
         description: |
           Maximum time an Activity task can stay in a task
-          queue before a Worker picks it up.
+          queue before a Worker picks it up. On expiry it
+          results in a non-retryable failure and no further
+          attempts are scheduled.
       - name: start-to-close-timeout
         type: duration
         description: |
           Maximum time for a single Activity attempt.
+          On expiry a new attempt may be scheduled if permitted
+          by the retry policy and schedule-to-close timeout.
           Either this or "schedule-to-close-timeout"
           is required.
       - name: heartbeat-timeout
         type: duration
         description: |
           Maximum time between successful Worker heartbeats.
+          On expiry the current activity attempt fails.
       - name: retry-initial-interval
         type: duration
         description: |
