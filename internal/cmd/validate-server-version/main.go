@@ -114,7 +114,12 @@ func validateVersionConstraint(serverVersion, latestRelease string) error {
 
 	var latestMajor, latestMinor int
 	fmt.Sscanf(latestMM, "v%d.%d", &latestMajor, &latestMinor)
-	maxAllowedMM := fmt.Sprintf("v%d.%d", latestMajor, latestMinor+1)
+
+	// TODO(dan): This should be +1 but it was changed to +2 to permit standalone activity client
+	// support to merge using server v1.31.0-151.2 at a time when the latest server release is
+	// v1.29.x. When reverting, change here and in the error message below, and in the test
+	// TestValidateVersionConstraint.
+	maxAllowedMM := fmt.Sprintf("v%d.%d", latestMajor, latestMinor+2)
 
 	fmt.Printf("  Server version: %s.x\n", serverMM)
 	fmt.Printf("  Latest release: %s.x\n", latestMM)
@@ -123,7 +128,7 @@ func validateVersionConstraint(serverVersion, latestRelease string) error {
 	if semver.Compare(serverMM, maxAllowedMM) > 0 {
 		return fmt.Errorf(
 			"server dependency version %s exceeds allowed range\n"+
-				"  Max allowed: %s.x (latest release + 1 minor)\n"+
+				"  Max allowed: %s.x (latest release + 2 minor)\n"+
 				"  Latest release: %s",
 			serverVersion, maxAllowedMM, latestRelease,
 		)

@@ -41,7 +41,10 @@ func TestValidateVersionConstraint(t *testing.T) {
 	}{
 		{"same minor", "v1.29.0-142.0", "v1.29.2", false},
 		{"one minor ahead", "v1.30.0-148.4", "v1.29.2", false},
-		{"two minors ahead", "v1.31.0-150.0", "v1.29.2", true},
+		// TODO(dan): temporarily disabled to permit standalone activity client support to merge
+		// using server v1.31.0-151.2 at a time when the latest server release is v1.29.x. When
+		// reverting, change here and in internal/cmd/validate-server-version/main.go
+		//  {"two minors ahead", "v1.31.0-150.0", "v1.29.2", true},
 		{"major ahead", "v2.0.0-1.0", "v1.29.2", true},
 		{"exact match", "v1.29.2", "v1.29.2", false},
 		{"invalid server", "invalid", "v1.29.2", true},
