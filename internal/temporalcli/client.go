@@ -50,6 +50,12 @@ func dialClient(cctx *CommandContext, c *cliext.ClientOptions) (client.Client, e
 		return nil, err
 	}
 
+	// SDK v1.40+ auto-enables TLS when API key credentials are set. Propagate
+	// explicit --tls=false so the SDK doesn't override the user's intent.
+	if c.FlagSet != nil && c.FlagSet.Changed("tls") && !c.Tls {
+		clientOpts.ConnectionOptions.TLSDisabled = true
+	}
+
 	// We do not put codec on data converter here, it is applied via
 	// interceptor. Same for failure conversion.
 	// XXX: If this is altered to be more dynamic, have to also update
