@@ -356,9 +356,9 @@ type ActivityReferenceOptions struct {
 
 func (v *ActivityReferenceOptions) BuildFlags(f *pflag.FlagSet) {
 	v.FlagSet = f
-	f.StringVarP(&v.ActivityId, "activity-id", "a", "", "Activity ID. This may be the ID of an Activity invoked by a Workflow, or of a Standalone Activity. Required.")
+	f.StringVarP(&v.ActivityId, "activity-id", "a", "", "Activity ID. Required.")
 	_ = cobra.MarkFlagRequired(f, "activity-id")
-	f.StringVarP(&v.RunId, "run-id", "r", "", "Run ID. If not set, targets the latest run.")
+	f.StringVarP(&v.RunId, "run-id", "r", "", "Activity Run ID. If not set, targets the latest run.")
 }
 
 type ActivityStartOptions struct {
@@ -387,7 +387,7 @@ type ActivityStartOptions struct {
 
 func (v *ActivityStartOptions) BuildFlags(f *pflag.FlagSet) {
 	v.FlagSet = f
-	f.StringVarP(&v.ActivityId, "activity-id", "a", "", "Activity ID. This may be the ID of an Activity invoked by a Workflow, or of a Standalone Activity. Required.")
+	f.StringVarP(&v.ActivityId, "activity-id", "a", "", "Activity ID. Required.")
 	_ = cobra.MarkFlagRequired(f, "activity-id")
 	f.StringVar(&v.Type, "type", "", "Activity Type name. Required.")
 	_ = cobra.MarkFlagRequired(f, "type")
@@ -511,10 +511,11 @@ func NewTemporalActivityCancelCommand(cctx *CommandContext, parent *TemporalActi
 }
 
 type TemporalActivityCompleteCommand struct {
-	Parent  *TemporalActivityCommand
-	Command cobra.Command
-	ActivityReferenceOptions
+	Parent     *TemporalActivityCommand
+	Command    cobra.Command
+	ActivityId string
 	WorkflowId string
+	RunId      string
 	Result     string
 }
 
@@ -530,10 +531,12 @@ func NewTemporalActivityCompleteCommand(cctx *CommandContext, parent *TemporalAc
 		s.Command.Long = "Complete an Activity, marking it as successfully finished. Specify the\nActivity ID and include a JSON result for the returned value:\n\n```\ntemporal activity complete \\\n    --activity-id YourActivityId \\\n    --workflow-id YourWorkflowId \\\n    --result '{\"YourResultKey\": \"YourResultVal\"}'\n```"
 	}
 	s.Command.Args = cobra.NoArgs
+	s.Command.Flags().StringVarP(&s.ActivityId, "activity-id", "a", "", "Activity ID. This may be the ID of an Activity invoked by a Workflow, or of a Standalone Activity. Required.")
+	_ = cobra.MarkFlagRequired(s.Command.Flags(), "activity-id")
 	s.Command.Flags().StringVarP(&s.WorkflowId, "workflow-id", "w", "", "Workflow ID. Required for workflow Activities. Omit for Standalone Activities.")
+	s.Command.Flags().StringVarP(&s.RunId, "run-id", "r", "", "Run ID. For workflow Activities (when --workflow-id is provided), this is the Workflow Run ID. For Standalone Activities, this is the Activity Run ID.")
 	s.Command.Flags().StringVar(&s.Result, "result", "", "Result `JSON` to return. Required.")
 	_ = cobra.MarkFlagRequired(s.Command.Flags(), "result")
-	s.ActivityReferenceOptions.BuildFlags(s.Command.Flags())
 	s.Command.Run = func(c *cobra.Command, args []string) {
 		if err := s.run(cctx, args); err != nil {
 			cctx.Options.Fail(err)
@@ -628,10 +631,11 @@ func NewTemporalActivityExecuteCommand(cctx *CommandContext, parent *TemporalAct
 }
 
 type TemporalActivityFailCommand struct {
-	Parent  *TemporalActivityCommand
-	Command cobra.Command
-	ActivityReferenceOptions
+	Parent     *TemporalActivityCommand
+	Command    cobra.Command
+	ActivityId string
 	WorkflowId string
+	RunId      string
 	Detail     string
 	Reason     string
 }
@@ -648,10 +652,12 @@ func NewTemporalActivityFailCommand(cctx *CommandContext, parent *TemporalActivi
 		s.Command.Long = "Fail an Activity, marking it as having encountered an error:\n\n```\ntemporal activity fail \\\n    --activity-id YourActivityId \\\n    --workflow-id YourWorkflowId\n```"
 	}
 	s.Command.Args = cobra.NoArgs
+	s.Command.Flags().StringVarP(&s.ActivityId, "activity-id", "a", "", "Activity ID. This may be the ID of an Activity invoked by a Workflow, or of a Standalone Activity. Required.")
+	_ = cobra.MarkFlagRequired(s.Command.Flags(), "activity-id")
 	s.Command.Flags().StringVarP(&s.WorkflowId, "workflow-id", "w", "", "Workflow ID. Required for workflow Activities. Omit for Standalone Activities.")
+	s.Command.Flags().StringVarP(&s.RunId, "run-id", "r", "", "Run ID. For workflow Activities (when --workflow-id is provided), this is the Workflow Run ID. For Standalone Activities, this is the Activity Run ID.")
 	s.Command.Flags().StringVar(&s.Detail, "detail", "", "Failure detail (JSON). Attached as the failure details payload.")
 	s.Command.Flags().StringVar(&s.Reason, "reason", "", "Failure reason. Attached as the failure message.")
-	s.ActivityReferenceOptions.BuildFlags(s.Command.Flags())
 	s.Command.Run = func(c *cobra.Command, args []string) {
 		if err := s.run(cctx, args); err != nil {
 			cctx.Options.Fail(err)

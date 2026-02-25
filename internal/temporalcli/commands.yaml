@@ -153,9 +153,7 @@ commands:
       - client
     docs:
       description-header: >-
-        Learn how to use Temporal Activity commands for completing or failing
-        Activity Executions in your Workflow. Optimize your Temporal Workflow
-        management effectively.
+        Learn how to use Temporal Activity commands to perform operations on Activity Executions.
       keywords:
         - activity
         - activity start
@@ -214,15 +212,27 @@ commands:
           --workflow-id YourWorkflowId \
           --result '{"YourResultKey": "YourResultVal"}'
       ```
-    option-sets:
-      - activity-reference
     options:
+      - name: activity-id
+        type: string
+        short: a
+        description: |
+          Activity ID. This may be the ID of an Activity
+          invoked by a Workflow, or of a Standalone Activity.
+        required: true
       - name: workflow-id
         type: string
         short: w
         description: |
           Workflow ID. Required for workflow Activities.
           Omit for Standalone Activities.
+      - name: run-id
+        type: string
+        short: r
+        description: |
+          Run ID. For workflow Activities (when --workflow-id is
+          provided), this is the Workflow Run ID. For Standalone
+          Activities, this is the Activity Run ID.
       - name: result
         type: string
         description: Result `JSON` to return.
@@ -292,15 +302,27 @@ commands:
           --activity-id YourActivityId \
           --workflow-id YourWorkflowId
       ```
-    option-sets:
-      - activity-reference
     options:
+      - name: activity-id
+        type: string
+        short: a
+        description: |
+          Activity ID. This may be the ID of an Activity
+          invoked by a Workflow, or of a Standalone Activity.
+        required: true
       - name: workflow-id
         type: string
         short: w
         description: |
           Workflow ID. Required for workflow Activities.
           Omit for Standalone Activities.
+      - name: run-id
+        type: string
+        short: r
+        description: |
+          Run ID. For workflow Activities (when --workflow-id is
+          provided), this is the Workflow Run ID. For Standalone
+          Activities, this is the Activity Run ID.
       - name: detail
         type: string
         description: |
@@ -4927,15 +4949,13 @@ option-sets:
       - name: activity-id
         type: string
         short: a
-        description: |
-          Activity ID. This may be the ID of an Activity invoked by a Workflow, or of a Standalone
-          Activity.
+        description: Activity ID.
         required: true
       - name: run-id
         type: string
         short: r
         description: |
-          Run ID.
+          Activity Run ID.
           If not set, targets the latest run.
 
   - name: activity-start
@@ -4943,9 +4963,7 @@ option-sets:
       - name: activity-id
         type: string
         short: a
-        description: |
-          Activity ID. This may be the ID of an Activity invoked by a Workflow, or of a Standalone
-          Activity.
+        description: Activity ID.
         required: true
       - name: type
         type: string
