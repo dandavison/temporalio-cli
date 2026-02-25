@@ -32,8 +32,6 @@ require (
 
 replace github.com/temporalio/cli/cliext => ./cliext
 
-replace go.temporal.io/sdk/contrib/envconfig => /Users/dan/src/temporal-all/repos/sdk-go/contrib/envconfig
-
 require (
 	cel.dev/expr v0.23.1 // indirect
 	cloud.google.com/go v0.120.0 // indirect
