@@ -4971,7 +4971,7 @@ option-sets:
         required: true
       - name: task-queue
         type: string
-        description: Activity Task queue.
+        description: Activity task queue.
         required: true
         short: t
       - name: schedule-to-close-timeout
