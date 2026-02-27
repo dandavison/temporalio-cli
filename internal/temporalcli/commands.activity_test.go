@@ -1317,3 +1317,55 @@ func (s *SharedServerSuite) TestActivity_List_Pagination() {
 	s.NoError(res.Err)
 	s.Equal(3, strings.Count(res.Stdout.String(), "page-test-"))
 }
+
+// TestActivity_Start_UseExisting_ShowsActualType verifies that when
+// --id-conflict-policy UseExisting returns an already-running activity, the
+// CLI prints the actual activity type (not the type the user requested).
+func (s *SharedServerSuite) TestActivity_Start_UseExisting_ShowsActualType() {
+	activityStarted := make(chan struct{})
+	s.Worker().OnDevActivity(func(ctx context.Context, a any) (any, error) {
+		close(activityStarted)
+		<-ctx.Done()
+		return nil, ctx.Err()
+	})
+
+	// Start first activity: type "DevActivity", id "conflict-type-test".
+	started := s.startActivity("conflict-type-test")
+	runID := started["runId"].(string)
+	<-activityStarted
+
+	// Start second activity with same ID but different --type, using UseExisting.
+	// The server should return the existing activity (type DevActivity).
+	// Text output
+	res := s.Execute(
+		"activity", "start",
+		"--activity-id", "conflict-type-test",
+		"--type", "SomeOtherType",
+		"--task-queue", s.Worker().Options.TaskQueue,
+		"--start-to-close-timeout", "30s",
+		"--id-conflict-policy", "UseExisting",
+		"--address", s.Address(),
+	)
+	s.NoError(res.Err)
+	out := res.Stdout.String()
+	s.ContainsOnSameLine(out, "Type", "DevActivity")
+	s.NotContains(out, "SomeOtherType")
+	s.ContainsOnSameLine(out, "RunId", runID)
+
+	// JSON output
+	res = s.Execute(
+		"activity", "start",
+		"-o", "json",
+		"--activity-id", "conflict-type-test",
+		"--type", "SomeOtherType",
+		"--task-queue", s.Worker().Options.TaskQueue,
+		"--start-to-close-timeout", "30s",
+		"--id-conflict-policy", "UseExisting",
+		"--address", s.Address(),
+	)
+	s.NoError(res.Err)
+	var jsonOut map[string]any
+	s.NoError(json.Unmarshal(res.Stdout.Bytes(), &jsonOut))
+	s.Equal("DevActivity", jsonOut["type"])
+	s.Equal(runID, jsonOut["runId"])
+}
