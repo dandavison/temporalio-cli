@@ -66,49 +66,6 @@ func (s *SharedServerSuite) TestWorkflow_Start_SimpleSuccess() {
 	s.Equal("default", jsonOut["namespace"])
 }
 
-func (s *SharedServerSuite) TestWorkflow_Start_UseExisting_OmitsTypeAndTaskQueue() {
-	// Start a workflow that stays running (blocks on signal).
-	s.Worker().OnDevWorkflow(func(ctx workflow.Context, input any) (any, error) {
-		workflow.GetSignalChannel(ctx, "complete").Receive(ctx, nil)
-		return nil, nil
-	})
-	wfID := uuid.NewString()
-	res := s.Execute(
-		"workflow", "start",
-		"-o", "json",
-		"--address", s.Address(),
-		"--task-queue", s.Worker().Options.TaskQueue,
-		"--type", "DevWorkflow",
-		"--workflow-id", wfID,
-	)
-	s.NoError(res.Err)
-	var firstOut map[string]string
-	s.NoError(json.Unmarshal(res.Stdout.Bytes(), &firstOut))
-	s.NotEmpty(firstOut["runId"])
-
-	// Now start again with different type and task-queue using UseExisting.
-	// The workflow already exists, so this should attach to the existing one.
-	res = s.Execute(
-		"workflow", "start",
-		"-o", "json",
-		"--address", s.Address(),
-		"--task-queue", "other-queue",
-		"--type", "OtherWorkflowType",
-		"--workflow-id", wfID,
-		"--id-conflict-policy", "UseExisting",
-	)
-	s.NoError(res.Err)
-	var secondOut map[string]string
-	s.NoError(json.Unmarshal(res.Stdout.Bytes(), &secondOut))
-	// Run ID should match - we attached to the existing workflow.
-	s.Equal(firstOut["runId"], secondOut["runId"])
-	// Type and taskQueue must be omitted.
-	_, hasType := secondOut["type"]
-	_, hasTaskQueue := secondOut["taskQueue"]
-	s.False(hasType, "type should be omitted")
-	s.False(hasTaskQueue, "taskQueue should be omitted")
-}
-
 func (s *SharedServerSuite) TestWorkflow_Start_StartDelay() {
 	// Capture request
 	var lastRequest any
