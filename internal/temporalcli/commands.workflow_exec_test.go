@@ -70,6 +70,49 @@ func (s *SharedServerSuite) TestWorkflow_Start_SimpleSuccess() {
 	s.Equal("default", jsonOut["namespace"])
 }
 
+func (s *SharedServerSuite) TestWorkflow_Start_UseExisting_OmitsTypeAndTaskQueue() {
+	// Start a workflow that stays running (blocks on signal).
+	s.Worker().OnDevWorkflow(func(ctx workflow.Context, input any) (any, error) {
+		workflow.GetSignalChannel(ctx, "complete").Receive(ctx, nil)
+		return nil, nil
+	})
+	wfID := uuid.NewString()
+	res := s.Execute(
+		"workflow", "start",
+		"-o", "json",
+		"--address", s.Address(),
+		"--task-queue", s.Worker().Options.TaskQueue,
+		"--type", "DevWorkflow",
+		"--workflow-id", wfID,
+	)
+	s.NoError(res.Err)
+	var firstOut map[string]string
+	s.NoError(json.Unmarshal(res.Stdout.Bytes(), &firstOut))
+	s.Equal("DevWorkflow", firstOut["type"])
+	s.Equal(s.Worker().Options.TaskQueue, firstOut["taskQueue"])
+
+	// Now start again with different type and task-queue using UseExisting.
+	// The workflow already exists, so this should attach to the existing one.
+	// The output must NOT claim the workflow has the caller's type/taskQueue.
+	res = s.Execute(
+		"workflow", "start",
+		"-o", "json",
+		"--address", s.Address(),
+		"--task-queue", "other-queue",
+		"--type", "OtherWorkflowType",
+		"--workflow-id", wfID,
+		"--id-conflict-policy", "UseExisting",
+	)
+	s.NoError(res.Err)
+	var secondOut map[string]string
+	s.NoError(json.Unmarshal(res.Stdout.Bytes(), &secondOut))
+	// Run ID should match - we attached to the existing workflow.
+	s.Equal(firstOut["runId"], secondOut["runId"])
+	// Type and taskQueue must NOT reflect the caller's (incorrect) values.
+	s.NotEqual("OtherWorkflowType", secondOut["type"], "type should not reflect caller's --type when attaching to existing workflow")
+	s.NotEqual("other-queue", secondOut["taskQueue"], "taskQueue should not reflect caller's --task-queue when attaching to existing workflow")
+}
+
 func (s *SharedServerSuite) TestWorkflow_Start_StartDelay() {
 	// Capture request
 	var lastRequest any
