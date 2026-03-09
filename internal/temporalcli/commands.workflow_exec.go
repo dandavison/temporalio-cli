@@ -545,23 +545,14 @@ func (c *TemporalWorkflowCommand) startWorkflow(
 	// Print running execution
 	if !cctx.JSONOutput || printRunningExecutionEvenWithJSON {
 		cctx.Printer.Println(color.MagentaString("Running execution:"))
-		var wfType, taskQueue string
-		if workflowOpts.IdConflictPolicy.Value != "UseExisting" {
-			wfType = sharedWorkflowOpts.Type
-			taskQueue = sharedWorkflowOpts.TaskQueue
-		}
 		err := cctx.Printer.PrintStructured(struct {
 			WorkflowId string `json:"workflowId"`
 			RunId      string `json:"runId"`
-			Type       string `json:"type,omitempty"`
 			Namespace  string `json:"namespace"`
-			TaskQueue  string `json:"taskQueue,omitempty"`
 		}{
 			WorkflowId: run.GetID(),
 			RunId:      run.GetRunID(),
-			Type:       wfType,
 			Namespace:  c.Namespace,
-			TaskQueue:  taskQueue,
 		}, printer.StructuredOptions{})
 		if err != nil {
 			return nil, fmt.Errorf("failed printing: %w", err)

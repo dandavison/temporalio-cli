@@ -46,8 +46,6 @@ func (s *SharedServerSuite) TestWorkflow_Start_SimpleSuccess() {
 	out := res.Stdout.String()
 	s.ContainsOnSameLine(out, "WorkflowId", "my-id1")
 	s.Contains(out, "RunId")
-	s.ContainsOnSameLine(out, "TaskQueue", s.Worker().Options.TaskQueue)
-	s.ContainsOnSameLine(out, "Type", "DevWorkflow")
 	s.ContainsOnSameLine(out, "Namespace", "default")
 
 	// JSON
@@ -65,8 +63,6 @@ func (s *SharedServerSuite) TestWorkflow_Start_SimpleSuccess() {
 	s.NoError(json.Unmarshal(res.Stdout.Bytes(), &jsonOut))
 	s.Equal("my-id2", jsonOut["workflowId"])
 	s.NotEmpty(jsonOut["runId"])
-	s.Equal(s.Worker().Options.TaskQueue, jsonOut["taskQueue"])
-	s.Equal("DevWorkflow", jsonOut["type"])
 	s.Equal("default", jsonOut["namespace"])
 }
 
@@ -88,12 +84,10 @@ func (s *SharedServerSuite) TestWorkflow_Start_UseExisting_OmitsTypeAndTaskQueue
 	s.NoError(res.Err)
 	var firstOut map[string]string
 	s.NoError(json.Unmarshal(res.Stdout.Bytes(), &firstOut))
-	s.Equal("DevWorkflow", firstOut["type"])
-	s.Equal(s.Worker().Options.TaskQueue, firstOut["taskQueue"])
+	s.NotEmpty(firstOut["runId"])
 
 	// Now start again with different type and task-queue using UseExisting.
 	// The workflow already exists, so this should attach to the existing one.
-	// The output must NOT claim the workflow has the caller's type/taskQueue.
 	res = s.Execute(
 		"workflow", "start",
 		"-o", "json",
@@ -108,11 +102,11 @@ func (s *SharedServerSuite) TestWorkflow_Start_UseExisting_OmitsTypeAndTaskQueue
 	s.NoError(json.Unmarshal(res.Stdout.Bytes(), &secondOut))
 	// Run ID should match - we attached to the existing workflow.
 	s.Equal(firstOut["runId"], secondOut["runId"])
-	// Type and taskQueue must be omitted — we don't know the actual values.
+	// Type and taskQueue must be omitted.
 	_, hasType := secondOut["type"]
 	_, hasTaskQueue := secondOut["taskQueue"]
-	s.False(hasType, "type should be omitted when attaching to existing workflow")
-	s.False(hasTaskQueue, "taskQueue should be omitted when attaching to existing workflow")
+	s.False(hasType, "type should be omitted")
+	s.False(hasTaskQueue, "taskQueue should be omitted")
 }
 
 func (s *SharedServerSuite) TestWorkflow_Start_StartDelay() {
