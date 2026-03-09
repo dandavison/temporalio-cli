@@ -108,9 +108,11 @@ func (s *SharedServerSuite) TestWorkflow_Start_UseExisting_OmitsTypeAndTaskQueue
 	s.NoError(json.Unmarshal(res.Stdout.Bytes(), &secondOut))
 	// Run ID should match - we attached to the existing workflow.
 	s.Equal(firstOut["runId"], secondOut["runId"])
-	// Type and taskQueue must NOT reflect the caller's (incorrect) values.
-	s.NotEqual("OtherWorkflowType", secondOut["type"], "type should not reflect caller's --type when attaching to existing workflow")
-	s.NotEqual("other-queue", secondOut["taskQueue"], "taskQueue should not reflect caller's --task-queue when attaching to existing workflow")
+	// Type and taskQueue must be omitted — we don't know the actual values.
+	_, hasType := secondOut["type"]
+	_, hasTaskQueue := secondOut["taskQueue"]
+	s.False(hasType, "type should be omitted when attaching to existing workflow")
+	s.False(hasTaskQueue, "taskQueue should be omitted when attaching to existing workflow")
 }
 
 func (s *SharedServerSuite) TestWorkflow_Start_StartDelay() {

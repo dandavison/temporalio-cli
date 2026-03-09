@@ -16,43 +16,27 @@ the caller's CLI flag values (`sharedWorkflowOpts.Type`,
 UseExisting` attaches to an already-running workflow, these values are the
 caller's *requested* values, not the actual workflow's values.
 
-### Approach: Describe after start when UseExisting
+### Approach: Omit type and taskQueue when UseExisting
 
-When `workflowOpts.IdConflictPolicy.Value == "UseExisting"`, after
-`cl.ExecuteWorkflow()` returns successfully, call
-`cl.DescribeWorkflowExecution(ctx, run.GetID(), run.GetRunID())` to obtain the
-actual `Type` and `TaskQueue` from the server. Use those in the output instead
-of the CLI flag values.
+When `workflowOpts.IdConflictPolicy.Value == "UseExisting"`, omit `Type` and
+`TaskQueue` from the "Running execution" output. We don't know whether
+`ExecuteWorkflow` created a new workflow or attached to an existing one, so the
+CLI flag values may be wrong. Rather than making an extra Describe RPC to find
+out the truth, simply don't claim anything.
 
-**Why this approach over alternatives:**
-
-- **vs. omitting type/taskQueue entirely**: Omitting is simpler but loses useful
-  information. When the workflow *is* newly started, the correct values are still
-  reported. When it already existed, the user gets the actual values — strictly
-  better UX.
-- **vs. raw gRPC call to access `Started` field**: Would require bypassing the
-  SDK's `ExecuteWorkflow` and reimplementing its logic (retry, eager dispatch,
-  etc). The Describe call is one extra RPC only in the UseExisting path, which
-  is acceptable.
-- **vs. always calling Describe**: Unnecessary cost in the common case. Only the
-  UseExisting path has the ambiguity.
+This is the simplest correct fix. A future enhancement could add a Describe call
+to report the actual values, but that's not needed now.
 
 ### Changes
 
 **File: `internal/temporalcli/commands.workflow_exec.go`**
 
-In `startWorkflow()` (line ~544), after `cl.ExecuteWorkflow()` succeeds and
-before printing the output:
+In `startWorkflow()` (line ~546), the "Running execution" output struct:
 
-1. Initialise `wfType := sharedWorkflowOpts.Type` and `taskQueue :=
-   sharedWorkflowOpts.TaskQueue` (existing behavior, used as defaults).
-2. If `workflowOpts.IdConflictPolicy.Value == "UseExisting"`, call
-   `cl.DescribeWorkflowExecution(cctx, run.GetID(), run.GetRunID())` and extract
-   the actual type and task queue from
-   `resp.WorkflowExecutionInfo.GetType().GetName()` and
-   `resp.WorkflowExecutionInfo.GetTaskQueue()`. Assign these to `wfType` and
-   `taskQueue`.
-3. Use `wfType` and `taskQueue` in the output struct instead of the flag values.
+1. Add `omitempty` to the `Type` and `TaskQueue` JSON tags.
+2. When `workflowOpts.IdConflictPolicy.Value == "UseExisting"`, set `Type` and
+   `TaskQueue` to empty strings (i.e. don't populate them). Otherwise, populate
+   them from the CLI flags as before.
 
 No other files need changes. The `workflow execute` path uses the same
 `startWorkflow()` function, so it's fixed for both commands.
