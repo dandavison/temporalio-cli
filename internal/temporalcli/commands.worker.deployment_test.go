@@ -1046,3 +1046,15 @@ func (s *SharedServerSuite) testDeploymentDescribeVersionTaskQueueStats(withPrio
 		s.NoError(run.Get(s.Context, nil))
 	}
 }
+
+func (s *SharedServerSuite) TestCreateWorkerDeployment() {
+	deploymentName := uuid.NewString()
+
+	s.EventuallyWithT(func(t *assert.CollectT) {
+		res := s.Execute(
+			"worker", "deployment", "create", "--name", deploymentName,
+		)
+		assert.NoError(t, res.Err)
+		assert.Contains(t, res.Stdout.String(), deploymentName)
+	}, 30*time.Second, 100*time.Millisecond)
+}
