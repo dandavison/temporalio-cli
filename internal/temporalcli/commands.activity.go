@@ -432,6 +432,7 @@ func printActivityDescription(cctx *CommandContext, info *activitypb.ActivityExe
 		LastAttemptCompleteTime time.Time       `cli:",cardOmitEmpty"`
 		LastHeartbeatTime       time.Time       `cli:",cardOmitEmpty"`
 		HeartbeatDetails        json.RawMessage `cli:",cardOmitEmpty"`
+		CanceledReason          string          `cli:",cardOmitEmpty"`
 		StateTransitionCount    int64
 	}{
 		ActivityId:              info.GetActivityId(),
@@ -452,6 +453,7 @@ func printActivityDescription(cctx *CommandContext, info *activitypb.ActivityExe
 		LastWorkerIdentity:      info.GetLastWorkerIdentity(),
 		LastAttemptCompleteTime: timestampToTime(info.GetLastAttemptCompleteTime()),
 		LastHeartbeatTime:       timestampToTime(info.GetLastHeartbeatTime()),
+		CanceledReason:          info.GetCanceledReason(),
 		StateTransitionCount:    info.GetStateTransitionCount(),
 	}
 	if f := info.GetLastFailure(); f != nil {
