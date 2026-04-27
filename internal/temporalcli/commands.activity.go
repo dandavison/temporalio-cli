@@ -393,6 +393,26 @@ func (c *TemporalActivityDescribeCommand) run(cctx *CommandContext, args []strin
 	return printActivityDescription(cctx, desc.RawExecutionInfo)
 }
 
+// listStatusShorthand renders an ActivityExecutionStatus for the text-mode
+// `activity list` output. The proto's ActivityExecutionStatus only has one
+// non-terminal value, RUNNING, which the server returns for both scheduled
+// (no worker has picked the activity up) and started (a worker is processing
+// it) activities. Calling that "Running" in the list view is actively
+// misleading for SAA operators: an activity scheduled on a queue with no
+// worker shows up as "Running" indefinitely. Render non-terminal rows as
+// "Pending" instead — terminal rows keep their existing labels.
+func listStatusShorthand(s enumspb.ActivityExecutionStatus) string {
+	if s == enumspb.ACTIVITY_EXECUTION_STATUS_RUNNING {
+		return "Pending"
+	}
+	for name, val := range enumspb.ActivityExecutionStatus_shorthandValue {
+		if int32(s) == val {
+			return name
+		}
+	}
+	return s.String()
+}
+
 func printActivityDescription(cctx *CommandContext, info *activitypb.ActivityExecutionInfo) error {
 	statusShorthand := func(s enumspb.ActivityExecutionStatus) string {
 		for name, val := range enumspb.ActivityExecutionStatus_shorthandValue {
@@ -535,7 +555,7 @@ func (c *TemporalActivityListCommand) run(cctx *CommandContext, args []string) e
 				_ = cctx.Printer.PrintStructured(exec, printer.StructuredOptions{})
 			} else {
 				textTable = append(textTable, map[string]any{
-					"Status":     exec.Status,
+					"Status":     listStatusShorthand(exec.Status),
 					"ActivityId": exec.ActivityId,
 					"Type":       exec.ActivityType.GetName(),
 					"TaskQueue":  exec.TaskQueue,
