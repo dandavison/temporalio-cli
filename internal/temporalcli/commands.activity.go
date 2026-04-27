@@ -233,7 +233,10 @@ func getActivityResult(cctx *CommandContext, cl client.Client, namespace, activi
 		return printActivityResult(cctx, activityID, runID, v.Result)
 	case *activitypb.ActivityExecutionOutcome_Failure:
 		if err := printActivityFailure(cctx, activityID, runID, v.Failure); err != nil {
-			cctx.Logger.Error("Activity failed, and printing the output also failed", "error", err)
+			cctx.Logger.Error("Activity ended with a non-success outcome, and printing the output also failed", "error", err)
+		}
+		if v.Failure.GetCanceledFailureInfo() != nil {
+			return fmt.Errorf("activity canceled")
 		}
 		return fmt.Errorf("activity failed")
 	default:
@@ -327,6 +330,14 @@ func printActivityResult(cctx *CommandContext, activityID, runID string, result 
 }
 
 func printActivityFailure(cctx *CommandContext, activityID, runID string, f *failure.Failure) error {
+	// A cancellation is encoded as a Failure with CanceledFailureInfo set
+	// (see the SDK's failure_converter.go). Distinguish it from a true failure
+	// so operators can tell why an activity ended without dropping into --raw.
+	canceled := f.GetCanceledFailureInfo() != nil
+	statusText := "FAILED"
+	if canceled {
+		statusText = "CANCELED"
+	}
 	if cctx.JSONOutput {
 		failureJSON, err := cctx.MarshalProtoJSON(f)
 		if err != nil {
@@ -340,18 +351,22 @@ func printActivityFailure(cctx *CommandContext, activityID, runID string, f *fai
 		}{
 			ActivityId: activityID,
 			RunId:      runID,
-			Status:     "FAILED",
+			Status:     statusText,
 			Failure:    failureJSON,
 		}, printer.StructuredOptions{})
 		return nil
 	}
 
 	cctx.Printer.Println(color.MagentaString("Results:"))
+	statusColored := color.RedString(statusText)
+	if canceled {
+		statusColored = color.YellowString(statusText)
+	}
 	_ = cctx.Printer.PrintStructured(struct {
 		Status  string
 		Failure string `cli:",cardOmitEmpty"`
 	}{
-		Status:  color.RedString("FAILED"),
+		Status:  statusColored,
 		Failure: cctx.MarshalFriendlyFailureBodyText(f, "    "),
 	}, printer.StructuredOptions{})
 	return nil
