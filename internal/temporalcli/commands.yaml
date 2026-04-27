@@ -484,6 +484,8 @@ commands:
 
       To later unpause the activity, see [unpause](#unpause). You may also want to
       [reset](#reset) the activity to unpause it while also starting it from the beginning.
+
+      Pausing Standalone Activities is not supported.
     options:
       - name: activity-id
         short: a
@@ -495,8 +497,16 @@ commands:
       - name: reason
         type: string
         description: Reason for pausing the Activity.
-    option-sets:
-      - workflow-reference
+      - name: workflow-id
+        type: string
+        short: w
+        description: |
+          Workflow ID. Required when pausing a workflow Activity. Pausing a
+          Standalone Activity is not supported.
+      - name: run-id
+        type: string
+        short: r
+        description: Run ID.
 
   - name: temporal activity unpause
     summary: Unpause an Activity

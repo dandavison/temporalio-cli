@@ -785,6 +785,13 @@ func (c *TemporalActivityPauseCommand) run(cctx *CommandContext, args []string) 
 	if c.ActivityId == "" {
 		return fmt.Errorf("Activity Id must be specified")
 	}
+	// pause is a workflow-activity-only operation; if the user invoked it
+	// without --workflow-id they are likely trying to pause a Standalone
+	// Activity, which is not supported. Emit a clear error rather than
+	// cobra's generic `required flag(s) "workflow-id" not set`.
+	if c.WorkflowId == "" {
+		return fmt.Errorf("pause is not supported for Standalone Activities; for a workflow Activity pass --workflow-id (and optionally --run-id)")
+	}
 
 	cl, err := dialClient(cctx, &c.Parent.ClientOptions)
 	if err != nil {

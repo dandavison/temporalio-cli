@@ -720,12 +720,13 @@ func NewTemporalActivityListCommand(cctx *CommandContext, parent *TemporalActivi
 }
 
 type TemporalActivityPauseCommand struct {
-	Parent  *TemporalActivityCommand
-	Command cobra.Command
-	WorkflowReferenceOptions
+	Parent     *TemporalActivityCommand
+	Command    cobra.Command
 	ActivityId string
 	Identity   string
 	Reason     string
+	WorkflowId string
+	RunId      string
 }
 
 func NewTemporalActivityPauseCommand(cctx *CommandContext, parent *TemporalActivityCommand) *TemporalActivityPauseCommand {
@@ -735,15 +736,16 @@ func NewTemporalActivityPauseCommand(cctx *CommandContext, parent *TemporalActiv
 	s.Command.Use = "pause [flags]"
 	s.Command.Short = "Pause an Activity"
 	if hasHighlighting {
-		s.Command.Long = "Pause an Activity. Not supported for Standalone Activities.\n\nIf the Activity is not currently running (e.g. because it previously\nfailed), it will not be run again until it is unpaused.\n\nHowever, if the Activity is currently running, it will run until the next\ntime it fails, completes, or times out, at which point the pause will kick in.\n\nIf the Activity is on its last retry attempt and fails, the failure will\nbe returned to the caller, just as if the Activity had not been paused.\n\nSpecify the Activity and Workflow IDs:\n\n\x1b[1mtemporal activity pause \\\n    --activity-id YourActivityId \\\n    --workflow-id YourWorkflowId\x1b[0m\n\nTo later unpause the activity, see unpause. You may also want to\nreset the activity to unpause it while also starting it from the beginning."
+		s.Command.Long = "Pause an Activity. Not supported for Standalone Activities.\n\nIf the Activity is not currently running (e.g. because it previously\nfailed), it will not be run again until it is unpaused.\n\nHowever, if the Activity is currently running, it will run until the next\ntime it fails, completes, or times out, at which point the pause will kick in.\n\nIf the Activity is on its last retry attempt and fails, the failure will\nbe returned to the caller, just as if the Activity had not been paused.\n\nSpecify the Activity and Workflow IDs:\n\n\x1b[1mtemporal activity pause \\\n    --activity-id YourActivityId \\\n    --workflow-id YourWorkflowId\x1b[0m\n\nTo later unpause the activity, see unpause. You may also want to\nreset the activity to unpause it while also starting it from the beginning.\n\nPausing Standalone Activities is not supported."
 	} else {
-		s.Command.Long = "Pause an Activity. Not supported for Standalone Activities.\n\nIf the Activity is not currently running (e.g. because it previously\nfailed), it will not be run again until it is unpaused.\n\nHowever, if the Activity is currently running, it will run until the next\ntime it fails, completes, or times out, at which point the pause will kick in.\n\nIf the Activity is on its last retry attempt and fails, the failure will\nbe returned to the caller, just as if the Activity had not been paused.\n\nSpecify the Activity and Workflow IDs:\n\n```\ntemporal activity pause \\\n    --activity-id YourActivityId \\\n    --workflow-id YourWorkflowId\n```\n\nTo later unpause the activity, see unpause. You may also want to\nreset the activity to unpause it while also starting it from the beginning."
+		s.Command.Long = "Pause an Activity. Not supported for Standalone Activities.\n\nIf the Activity is not currently running (e.g. because it previously\nfailed), it will not be run again until it is unpaused.\n\nHowever, if the Activity is currently running, it will run until the next\ntime it fails, completes, or times out, at which point the pause will kick in.\n\nIf the Activity is on its last retry attempt and fails, the failure will\nbe returned to the caller, just as if the Activity had not been paused.\n\nSpecify the Activity and Workflow IDs:\n\n```\ntemporal activity pause \\\n    --activity-id YourActivityId \\\n    --workflow-id YourWorkflowId\n```\n\nTo later unpause the activity, see unpause. You may also want to\nreset the activity to unpause it while also starting it from the beginning.\n\nPausing Standalone Activities is not supported."
 	}
 	s.Command.Args = cobra.NoArgs
 	s.Command.Flags().StringVarP(&s.ActivityId, "activity-id", "a", "", "The Activity ID to pause. Required.")
 	s.Command.Flags().StringVar(&s.Identity, "identity", "", "The identity of the user or client submitting this request.")
 	s.Command.Flags().StringVar(&s.Reason, "reason", "", "Reason for pausing the Activity.")
-	s.WorkflowReferenceOptions.BuildFlags(s.Command.Flags())
+	s.Command.Flags().StringVarP(&s.WorkflowId, "workflow-id", "w", "", "Workflow ID. Required when pausing a workflow Activity. Pausing a Standalone Activity is not supported.")
+	s.Command.Flags().StringVarP(&s.RunId, "run-id", "r", "", "Run ID.")
 	s.Command.Run = func(c *cobra.Command, args []string) {
 		if err := s.run(cctx, args); err != nil {
 			cctx.Options.Fail(err)
