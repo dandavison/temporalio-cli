@@ -473,7 +473,28 @@ func printActivityDescription(cctx *CommandContext, info *activitypb.ActivityExe
 			}
 		}
 	}
-	return cctx.Printer.PrintStructured(d, printer.StructuredOptions{})
+	if err := cctx.Printer.PrintStructured(d, printer.StructuredOptions{}); err != nil {
+		return err
+	}
+
+	// Emit a separate "Metadata:" card for the static summary/details the user
+	// attached at start time. This mirrors `temporal workflow describe`'s
+	// rendering and lets operators see the human-facing labels they set
+	// without dropping into `-o json`.
+	staticSummary := info.GetUserMetadata().GetSummary()
+	staticDetails := info.GetUserMetadata().GetDetails()
+	if len(staticSummary.GetData()) > 0 || len(staticDetails.GetData()) > 0 {
+		cctx.Printer.Println()
+		cctx.Printer.Println(color.MagentaString("Metadata:"))
+		_ = cctx.Printer.PrintStructured(struct {
+			StaticSummary *common.Payload `cli:",cardOmitEmpty"`
+			StaticDetails *common.Payload `cli:",cardOmitEmpty"`
+		}{
+			StaticSummary: staticSummary,
+			StaticDetails: staticDetails,
+		}, printer.StructuredOptions{})
+	}
+	return nil
 }
 
 func (c *TemporalActivityListCommand) run(cctx *CommandContext, args []string) error {
