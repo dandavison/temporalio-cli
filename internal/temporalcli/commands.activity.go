@@ -538,13 +538,19 @@ func (c *TemporalActivityListCommand) run(cctx *CommandContext, args []string) e
 					"Status":     exec.Status,
 					"ActivityId": exec.ActivityId,
 					"Type":       exec.ActivityType.GetName(),
+					"TaskQueue":  exec.TaskQueue,
 					"StartTime":  exec.ScheduleTime.AsTime(),
+					"CloseTime":  timestampToTime(exec.CloseTime),
 				})
 			}
 		}
 		if len(textTable) > 0 {
+			// Include TaskQueue and CloseTime in the default text columns so
+			// operators can see which queue an activity is on and when it
+			// finished without dropping into `-o json`. CloseTime is empty for
+			// non-terminal rows, which the table renderer just leaves blank.
 			_ = cctx.Printer.PrintStructured(textTable, printer.StructuredOptions{
-				Fields: []string{"Status", "ActivityId", "Type", "StartTime"},
+				Fields: []string{"Status", "ActivityId", "Type", "TaskQueue", "StartTime", "CloseTime"},
 				Table:  &printer.TableOptions{NoHeader: pageIndex > 0},
 			})
 		}
