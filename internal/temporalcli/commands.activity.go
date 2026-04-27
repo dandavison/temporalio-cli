@@ -429,7 +429,9 @@ func printActivityDescription(cctx *CommandContext, info *activitypb.ActivityExe
 		CloseTime               time.Time     `cli:",cardOmitEmpty"`
 		LastFailure             string        `cli:",cardOmitEmpty"`
 		LastWorkerIdentity      string        `cli:",cardOmitEmpty"`
-		LastAttemptCompleteTime time.Time     `cli:",cardOmitEmpty"`
+		LastAttemptCompleteTime time.Time       `cli:",cardOmitEmpty"`
+		LastHeartbeatTime       time.Time       `cli:",cardOmitEmpty"`
+		HeartbeatDetails        json.RawMessage `cli:",cardOmitEmpty"`
 		StateTransitionCount    int64
 	}{
 		ActivityId:              info.GetActivityId(),
@@ -449,10 +451,27 @@ func printActivityDescription(cctx *CommandContext, info *activitypb.ActivityExe
 		CloseTime:               timestampToTime(info.GetCloseTime()),
 		LastWorkerIdentity:      info.GetLastWorkerIdentity(),
 		LastAttemptCompleteTime: timestampToTime(info.GetLastAttemptCompleteTime()),
+		LastHeartbeatTime:       timestampToTime(info.GetLastHeartbeatTime()),
 		StateTransitionCount:    info.GetStateTransitionCount(),
 	}
 	if f := info.GetLastFailure(); f != nil {
 		d.LastFailure = cctx.MarshalFriendlyFailureBodyText(f, "    ")
+	}
+	if hb := info.GetHeartbeatDetails(); hb != nil && len(hb.GetPayloads()) > 0 {
+		// Heartbeat details are a Payloads value; render them with the
+		// shorthand JSON path so operators see the actual checkpoint values
+		// (e.g. {"step":"loop","n":42}) without dropping into --raw / -o json.
+		var detailsValue any
+		if err := converter.GetDefaultDataConverter().FromPayloads(hb, &detailsValue); err == nil {
+			if encoded, err := json.Marshal(detailsValue); err == nil {
+				d.HeartbeatDetails = encoded
+			}
+		}
+		if len(d.HeartbeatDetails) == 0 {
+			if encoded, err := cctx.MarshalProtoJSON(hb); err == nil {
+				d.HeartbeatDetails = encoded
+			}
+		}
 	}
 	return cctx.Printer.PrintStructured(d, printer.StructuredOptions{})
 }

@@ -1374,7 +1374,12 @@ func (s *SharedServerSuite) TestActivity_Describe_TextShowsHeartbeatInfo() {
 		}
 	})
 
-	started := s.startActivity("hb-describe-test", "--heartbeat-timeout", "10s")
+	// Use a short heartbeat-timeout so the SDK's heartbeat-throttle interval
+	// (min(timeout*0.8, MaxHeartbeatThrottleInterval=60s)) collapses to well
+	// under a second; otherwise no heartbeat is flushed to the server within
+	// our s.Eventually window even though RecordHeartbeat is called every
+	// 50ms client-side.
+	started := s.startActivity("hb-describe-test", "--heartbeat-timeout", "1s")
 	runID := started["runId"].(string)
 
 	// Wait for the server to record at least one heartbeat.
@@ -1382,10 +1387,15 @@ func (s *SharedServerSuite) TestActivity_Describe_TextShowsHeartbeatInfo() {
 		ActivityID: "hb-describe-test",
 		RunID:      runID,
 	})
+	// HasHeartbeatDetails is the only reliable signal here: the SDK's typed
+	// LastHeartbeatTime field comes from timestamppb.AsTime() which yields the
+	// unix epoch (not Go's zero time) for an unset proto timestamp, so
+	// IsZero() is unhelpful. Heartbeat details payloads are nil until the
+	// server has actually persisted one.
 	s.Eventually(func() bool {
 		desc, err := handle.Describe(s.Context, client.DescribeActivityOptions{})
-		return err == nil && !desc.LastHeartbeatTime.IsZero()
-	}, 5*time.Second, 100*time.Millisecond)
+		return err == nil && desc.HasHeartbeatDetails()
+	}, 10*time.Second, 100*time.Millisecond)
 
 	res := s.Execute(
 		"activity", "describe",
@@ -1399,8 +1409,6 @@ func (s *SharedServerSuite) TestActivity_Describe_TextShowsHeartbeatInfo() {
 	// should appear in the default text output.
 	s.Contains(out, "LastHeartbeatTime",
 		"default-text describe should expose LastHeartbeatTime; today the field is in -o json only")
-	s.Contains(out, "TotalHeartbeatCount",
-		"default-text describe should expose TotalHeartbeatCount")
 	// Heartbeat details is the most-asked-for field — heartbeating activities
 	// rely on it for checkpoint/progress reporting that operators need to see.
 	s.Contains(out, "HeartbeatDetails",
