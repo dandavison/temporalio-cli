@@ -14,6 +14,7 @@ import (
 	"go.temporal.io/api/history/v1"
 	"go.temporal.io/api/serviceerror"
 	"go.temporal.io/api/workflowservice/v1"
+	"go.temporal.io/sdk/activity"
 	"go.temporal.io/sdk/client"
 	"go.temporal.io/sdk/converter"
 	"go.temporal.io/sdk/temporal"
@@ -1334,4 +1335,525 @@ func (s *SharedServerSuite) TestActivity_List_Pagination() {
 	)
 	s.NoError(res.Err)
 	s.Equal(3, strings.Count(res.Stdout.String(), "page-test-"))
+}
+
+// =============================================================================
+// Standalone Activity (SAA) UX bug coverage
+//
+// The following tests cover bugs and rough edges surfaced while exercising the
+// `temporal activity` subcommands against Standalone Activities during the
+// public-preview UX pass. Each test is written to fail today and to pass once
+// the underlying CLI (or, where noted, server) bug is fixed. Update or remove
+// individual tests as the corresponding fixes land.
+// =============================================================================
+
+// Bug: `temporal activity describe` (default text output) hides recorded
+// heartbeat info. The fields are present on the underlying ActivityExecutionInfo
+// proto and surfaced via `-o json`, but the text card omits them entirely,
+// leaving SAA operators with no visible signal that their workers are
+// heartbeating. The information is critical for diagnosing stuck activities.
+//
+// Expected after fix: text describe of an SAA that has heartbeated should
+// include LastHeartbeatTime, TotalHeartbeatCount, and HeartbeatDetails.
+func (s *SharedServerSuite) TestActivity_Describe_TextShowsHeartbeatInfo() {
+	s.Worker().OnDevActivity(func(ctx context.Context, a any) (any, error) {
+		// Record an immediate heartbeat with non-trivial details, then keep
+		// beating until canceled so describe can be inspected mid-flight.
+		activity.RecordHeartbeat(ctx, map[string]any{"step": "first", "n": 1})
+		ticker := time.NewTicker(50 * time.Millisecond)
+		defer ticker.Stop()
+		i := 1
+		for {
+			select {
+			case <-ctx.Done():
+				return nil, ctx.Err()
+			case <-ticker.C:
+				i++
+				activity.RecordHeartbeat(ctx, map[string]any{"step": "loop", "n": i})
+			}
+		}
+	})
+
+	started := s.startActivity("hb-describe-test", "--heartbeat-timeout", "10s")
+	runID := started["runId"].(string)
+
+	// Wait for the server to record at least one heartbeat.
+	handle := s.Client.GetActivityHandle(client.GetActivityHandleOptions{
+		ActivityID: "hb-describe-test",
+		RunID:      runID,
+	})
+	s.Eventually(func() bool {
+		desc, err := handle.Describe(s.Context, client.DescribeActivityOptions{})
+		return err == nil && !desc.LastHeartbeatTime.IsZero()
+	}, 5*time.Second, 100*time.Millisecond)
+
+	res := s.Execute(
+		"activity", "describe",
+		"--activity-id", "hb-describe-test",
+		"--run-id", runID,
+		"--address", s.Address(),
+	)
+	s.NoError(res.Err)
+	out := res.Stdout.String()
+	// Bug: today the text card prints none of these. After fix, all three
+	// should appear in the default text output.
+	s.Contains(out, "LastHeartbeatTime",
+		"default-text describe should expose LastHeartbeatTime; today the field is in -o json only")
+	s.Contains(out, "TotalHeartbeatCount",
+		"default-text describe should expose TotalHeartbeatCount")
+	// Heartbeat details is the most-asked-for field — heartbeating activities
+	// rely on it for checkpoint/progress reporting that operators need to see.
+	s.Contains(out, "HeartbeatDetails",
+		"default-text describe should expose HeartbeatDetails")
+}
+
+// Bug: text describe omits the user-supplied static summary and details that
+// SAA users explicitly attach for human consumption. They are stored in
+// ActivityExecutionInfo.user_metadata and visible via `-o json` and the Web
+// UI, but the default text card drops them.
+//
+// Expected after fix: `--static-summary` and `--static-details` values supplied
+// at start time should appear (decoded) in default text describe output.
+func (s *SharedServerSuite) TestActivity_Describe_TextShowsUserMetadata() {
+	activityStarted := make(chan struct{})
+	s.Worker().OnDevActivity(func(ctx context.Context, a any) (any, error) {
+		close(activityStarted)
+		<-ctx.Done()
+		return nil, ctx.Err()
+	})
+
+	started := s.startActivity("um-describe-test",
+		"--static-summary", "Backfill batch #42",
+		"--static-details", "Reprocesses orders for tenant=acme",
+	)
+	runID := started["runId"].(string)
+	<-activityStarted
+
+	res := s.Execute(
+		"activity", "describe",
+		"--activity-id", "um-describe-test",
+		"--run-id", runID,
+		"--address", s.Address(),
+	)
+	s.NoError(res.Err)
+	out := res.Stdout.String()
+	// Bug: text describe prints nothing user-metadata-related.
+	s.Contains(out, "Backfill batch #42",
+		"static-summary should be visible in default text describe output")
+	s.Contains(out, "Reprocesses orders for tenant=acme",
+		"static-details should be visible in default text describe output")
+}
+
+// Bug: text describe omits CanceledReason. When an operator cancels an SAA
+// with `--reason "..."`, the supplied reason is recorded on the server (and
+// visible via `-o json`) but invisible in the default text card, making it
+// impossible to see why an activity was canceled without dropping into JSON.
+//
+// Expected after fix: the cancellation reason should appear in default text
+// describe output once the server has recorded it.
+func (s *SharedServerSuite) TestActivity_Describe_TextShowsCanceledReason() {
+	activityStarted := make(chan struct{})
+	s.Worker().OnDevActivity(func(ctx context.Context, a any) (any, error) {
+		close(activityStarted)
+		// Heartbeat so cancellation propagates back into the activity ctx.
+		for {
+			activity.RecordHeartbeat(ctx)
+			select {
+			case <-ctx.Done():
+				return nil, ctx.Err()
+			case <-time.After(50 * time.Millisecond):
+			}
+		}
+	})
+
+	started := s.startActivity("cr-describe-test", "--heartbeat-timeout", "10s")
+	runID := started["runId"].(string)
+	<-activityStarted
+
+	cancelRes := s.Execute(
+		"activity", "cancel",
+		"--activity-id", "cr-describe-test",
+		"--run-id", runID,
+		"--reason", "operator-initiated-rollback",
+		"--address", s.Address(),
+	)
+	s.NoError(cancelRes.Err)
+
+	// Wait for the server to record the cancellation reason.
+	handle := s.Client.GetActivityHandle(client.GetActivityHandleOptions{
+		ActivityID: "cr-describe-test",
+		RunID:      runID,
+	})
+	s.Eventually(func() bool {
+		desc, err := handle.Describe(s.Context, client.DescribeActivityOptions{})
+		return err == nil && desc.CanceledReason == "operator-initiated-rollback"
+	}, 5*time.Second, 100*time.Millisecond)
+
+	res := s.Execute(
+		"activity", "describe",
+		"--activity-id", "cr-describe-test",
+		"--run-id", runID,
+		"--address", s.Address(),
+	)
+	s.NoError(res.Err)
+	out := res.Stdout.String()
+	// Bug: text describe doesn't surface canceledReason at all.
+	s.Contains(out, "operator-initiated-rollback",
+		"default-text describe should expose CanceledReason after a cancel-with-reason")
+}
+
+// Bug: `temporal activity pause` is documented as "Not supported for Standalone
+// Activities", but the only error an SAA user sees today is cobra's generic
+// `required flag(s) "workflow-id" not set`, suggesting they merely forgot a
+// flag rather than that the command is fundamentally inapplicable.
+//
+// Expected after fix: invoking `pause` for an SAA (i.e. with --activity-id but
+// no --workflow-id) should yield a clear "not supported for Standalone
+// Activities" error.
+func (s *SharedServerSuite) TestActivity_Pause_StandaloneActivity_ClearError() {
+	s.Worker().OnDevActivity(func(ctx context.Context, a any) (any, error) {
+		<-ctx.Done()
+		return nil, ctx.Err()
+	})
+	s.startActivity("pause-saa-test")
+
+	res := s.Execute(
+		"activity", "pause",
+		"--activity-id", "pause-saa-test",
+		"--address", s.Address(),
+	)
+	s.Error(res.Err)
+	msg := res.Err.Error()
+	lower := strings.ToLower(msg)
+	// Bug: today the error is `required flag(s) "workflow-id" not set`.
+	s.NotContainsf(lower, `required flag(s) "workflow-id"`,
+		"pause SAA error should not be cobra's generic required-flag message; got: %s", msg)
+	s.Containsf(lower, "standalone",
+		"pause SAA error should explicitly mention Standalone Activities; got: %s", msg)
+}
+
+// Bug: `temporal activity unpause` is documented as "Not supported for
+// Standalone Activities", but an SAA user sees `must set either workflow ID
+// or query`, which doesn't tell them the command is inapplicable.
+//
+// Expected after fix: invoking `unpause` with --activity-id only should yield
+// a clear "not supported for Standalone Activities" error.
+func (s *SharedServerSuite) TestActivity_Unpause_StandaloneActivity_ClearError() {
+	s.Worker().OnDevActivity(func(ctx context.Context, a any) (any, error) {
+		<-ctx.Done()
+		return nil, ctx.Err()
+	})
+	s.startActivity("unpause-saa-test")
+
+	res := s.Execute(
+		"activity", "unpause",
+		"--activity-id", "unpause-saa-test",
+		"--address", s.Address(),
+	)
+	s.Error(res.Err)
+	msg := res.Err.Error()
+	lower := strings.ToLower(msg)
+	s.NotContainsf(lower, "either --activity-id and --workflow-id, or --query must be set",
+		"unpause SAA error should not be the generic 'either workflow-id or query' message; got: %s", msg)
+	s.Containsf(lower, "standalone",
+		"unpause SAA error should explicitly mention Standalone Activities; got: %s", msg)
+}
+
+// Bug: `temporal activity reset` is documented as "Not supported for Standalone
+// Activities", but an SAA user sees `must set either workflow ID or query`.
+//
+// Expected after fix: invoking `reset` with --activity-id only should yield a
+// clear "not supported for Standalone Activities" error.
+func (s *SharedServerSuite) TestActivity_Reset_StandaloneActivity_ClearError() {
+	s.Worker().OnDevActivity(func(ctx context.Context, a any) (any, error) {
+		<-ctx.Done()
+		return nil, ctx.Err()
+	})
+	s.startActivity("reset-saa-test")
+
+	res := s.Execute(
+		"activity", "reset",
+		"--activity-id", "reset-saa-test",
+		"--address", s.Address(),
+	)
+	s.Error(res.Err)
+	msg := res.Err.Error()
+	lower := strings.ToLower(msg)
+	s.NotContainsf(lower, "either --activity-id and --workflow-id, or --query must be set",
+		"reset SAA error should not be the generic 'either workflow-id or query' message; got: %s", msg)
+	s.Containsf(lower, "standalone",
+		"reset SAA error should explicitly mention Standalone Activities; got: %s", msg)
+}
+
+// Bug: `temporal activity update-options` is documented as "Not supported for
+// Standalone Activities", but an SAA user trying to retune timeouts sees the
+// generic `must set either workflow ID or query`, again hiding the fact that
+// the command is fundamentally inapplicable.
+//
+// Expected after fix: invoking `update-options` for an SAA should yield a
+// clear "not supported for Standalone Activities" error.
+func (s *SharedServerSuite) TestActivity_UpdateOptions_StandaloneActivity_ClearError() {
+	s.Worker().OnDevActivity(func(ctx context.Context, a any) (any, error) {
+		<-ctx.Done()
+		return nil, ctx.Err()
+	})
+	s.startActivity("uo-saa-test")
+
+	res := s.Execute(
+		"activity", "update-options",
+		"--activity-id", "uo-saa-test",
+		"--start-to-close-timeout", "45s",
+		"--address", s.Address(),
+	)
+	s.Error(res.Err)
+	msg := res.Err.Error()
+	lower := strings.ToLower(msg)
+	s.NotContainsf(lower, "either --activity-id and --workflow-id, or --query must be set",
+		"update-options SAA error should not be the generic 'either workflow-id or query' message; got: %s", msg)
+	s.Containsf(lower, "standalone",
+		"update-options SAA error should explicitly mention Standalone Activities; got: %s", msg)
+}
+
+// Bug: `temporal activity terminate` (and other commands using defaultReason)
+// always renders its default reason as `Requested from CLI by <unknown-user>`
+// on every machine, because the condition in commands.workflow.go's username()
+// is inverted (`err != nil` instead of `err == nil`), so the success branch of
+// `user.Current()` is never taken. This makes the recorded audit trail useless
+// for distinguishing operators.
+//
+// Expected after fix: terminating without `--reason` should record a default
+// reason that does not contain the literal "<unknown-user>".
+func (s *SharedServerSuite) TestActivity_Terminate_DefaultReason_NoUnknownUser() {
+	activityStarted := make(chan struct{})
+	s.Worker().OnDevActivity(func(ctx context.Context, a any) (any, error) {
+		close(activityStarted)
+		<-ctx.Done()
+		return nil, ctx.Err()
+	})
+
+	started := s.startActivity("terminate-default-reason-test")
+	runID := started["runId"].(string)
+	<-activityStarted
+
+	res := s.Execute(
+		"activity", "terminate",
+		"--activity-id", "terminate-default-reason-test",
+		"--run-id", runID,
+		"--address", s.Address(),
+	)
+	s.NoError(res.Err)
+
+	// Wait for the activity to actually transition to TERMINATED, then poll
+	// for its outcome via `activity result -o json` — that command surfaces
+	// the recorded failure message, which is where the termination reason
+	// (the supplied --reason or defaultReason()) lives.
+	handle := s.Client.GetActivityHandle(client.GetActivityHandleOptions{
+		ActivityID: "terminate-default-reason-test",
+		RunID:      runID,
+	})
+	s.Eventually(func() bool {
+		desc, err := handle.Describe(s.Context, client.DescribeActivityOptions{})
+		return err == nil && desc.Status == enums.ACTIVITY_EXECUTION_STATUS_TERMINATED
+	}, 5*time.Second, 100*time.Millisecond)
+
+	res = s.Execute(
+		"activity", "result", "-o", "json",
+		"--activity-id", "terminate-default-reason-test",
+		"--run-id", runID,
+		"--address", s.Address(),
+	)
+	// `result` returns a non-nil err for any non-success outcome; the JSON
+	// payload (with the failure body) is still printed on stdout.
+	s.NotEmptyf(res.Stdout.String(), "activity result should produce output for terminated SAA")
+	var outcome map[string]any
+	s.NoError(json.Unmarshal(res.Stdout.Bytes(), &outcome))
+	failure, _ := outcome["failure"].(map[string]any)
+	s.NotNilf(failure, "activity result -o json for a terminated SAA should include the failure body; got: %s", res.Stdout.String())
+	failureMsg, _ := failure["message"].(string)
+	s.Containsf(failureMsg, "Requested from CLI",
+		"recorded reason should be the CLI-default 'Requested from CLI by <user>' message; got: %q", failureMsg)
+	// Bug: defaultReason() always renders as "Requested from CLI by <unknown-user>"
+	// because of the inverted `err != nil` check in username() in
+	// commands.workflow.go: `if u, err := user.Current(); err != nil && u.Username != ""`
+	// means the success branch of user.Current() is never taken.
+	s.NotContainsf(failureMsg, "<unknown-user>",
+		"default termination reason should not literally contain '<unknown-user>'; "+
+			"the inverted condition in username() makes the user.Current() success path unreachable; got: %q",
+		failureMsg)
+}
+
+// Bug: `temporal activity result` reports `Status: FAILED` when the activity
+// outcome is a cancellation. printActivityFailure unconditionally renders
+// FAILED for any non-Result outcome, conflating CANCELED with FAILED. SAA
+// users polling for the outcome of a cancellation see the same status they
+// would see for a real worker-side failure.
+//
+// Expected after fix: `result` on a CANCELED SAA should report Status=CANCELED
+// in both text and JSON output.
+func (s *SharedServerSuite) TestActivity_Result_OnCanceledActivity_ShowsCanceledStatus() {
+	activityStarted := make(chan struct{})
+	s.Worker().OnDevActivity(func(ctx context.Context, a any) (any, error) {
+		close(activityStarted)
+		// Heartbeat in a tight loop so the cancellation request propagates
+		// promptly into the activity ctx.
+		for {
+			activity.RecordHeartbeat(ctx)
+			select {
+			case <-ctx.Done():
+				return nil, ctx.Err()
+			case <-time.After(50 * time.Millisecond):
+			}
+		}
+	})
+
+	started := s.startActivity("result-canceled-test", "--heartbeat-timeout", "10s")
+	runID := started["runId"].(string)
+	<-activityStarted
+
+	cancelRes := s.Execute(
+		"activity", "cancel",
+		"--activity-id", "result-canceled-test",
+		"--run-id", runID,
+		"--reason", "test-cancel",
+		"--address", s.Address(),
+	)
+	s.NoError(cancelRes.Err)
+
+	// Wait for the activity to actually transition to CANCELED on the server.
+	handle := s.Client.GetActivityHandle(client.GetActivityHandleOptions{
+		ActivityID: "result-canceled-test",
+		RunID:      runID,
+	})
+	s.Eventually(func() bool {
+		desc, err := handle.Describe(s.Context, client.DescribeActivityOptions{})
+		return err == nil && desc.Status == enums.ACTIVITY_EXECUTION_STATUS_CANCELED
+	}, 10*time.Second, 100*time.Millisecond)
+
+	// Text output: should report Status: CANCELED, not FAILED.
+	res := s.Execute(
+		"activity", "result",
+		"--activity-id", "result-canceled-test",
+		"--run-id", runID,
+		"--address", s.Address(),
+	)
+	out := res.Stdout.String()
+	// Bug: printActivityFailure prints Status FAILED for any non-Result outcome.
+	s.ContainsOnSameLine(out, "Status", "CANCELED")
+
+	// JSON output: status field should be "CANCELED".
+	res = s.Execute(
+		"activity", "result", "-o", "json",
+		"--activity-id", "result-canceled-test",
+		"--run-id", runID,
+		"--address", s.Address(),
+	)
+	var jsonOut map[string]any
+	s.NoError(json.Unmarshal(res.Stdout.Bytes(), &jsonOut))
+	s.Equal("CANCELED", jsonOut["status"],
+		"`activity result -o json` should report status=CANCELED for a canceled SAA, not FAILED")
+}
+
+// Bug: the default-text columns of `temporal activity list` are unhelpfully
+// sparse: only Status, ActivityId, Type, StartTime are shown, even though the
+// server includes TaskQueue, CloseTime, and ExecutionDuration in
+// ActivityExecutionListInfo. SAA operators have to drop to `-o json` (or call
+// describe per row) to see which task queue an activity is on or when it
+// finished — both common questions during triage.
+//
+// Expected after fix: the text-mode list should include at least TaskQueue
+// and CloseTime as columns.
+func (s *SharedServerSuite) TestActivity_List_TextIncludesTaskQueueAndCloseTime() {
+	s.Worker().OnDevActivity(func(ctx context.Context, a any) (any, error) {
+		return "done", nil
+	})
+
+	uniqueKW := "list-cols-" + uuid.NewString()[:8]
+	activityID := "list-cols-test-" + uniqueKW
+	s.startActivity(activityID,
+		"--search-attribute", fmt.Sprintf(`CustomKeywordField="%s"`, uniqueKW),
+	)
+
+	// Wait for the row to be visible (and terminal — CloseTime only populates
+	// after the activity reaches a terminal state).
+	s.Eventually(func() bool {
+		r := s.Execute(
+			"activity", "list", "-o", "json",
+			"--query", fmt.Sprintf(`CustomKeywordField = "%s"`, uniqueKW),
+			"--address", s.Address(),
+		)
+		return r.Err == nil && strings.Contains(r.Stdout.String(), "ACTIVITY_EXECUTION_STATUS_COMPLETED")
+	}, 5*time.Second, 200*time.Millisecond)
+
+	res := s.Execute(
+		"activity", "list",
+		"--query", fmt.Sprintf(`CustomKeywordField = "%s"`, uniqueKW),
+		"--address", s.Address(),
+	)
+	s.NoError(res.Err)
+	out := res.Stdout.String()
+	// Bug: text list omits both columns even though the server returns them.
+	s.Contains(out, "TaskQueue",
+		"`activity list` text output should include the TaskQueue column")
+	s.Contains(out, "CloseTime",
+		"`activity list` text output should include the CloseTime column for terminal activities")
+}
+
+// Bug: `temporal activity list` shows Status=Running for SAAs that have been
+// scheduled but never picked up by a worker (e.g. wrong task-queue name or the
+// worker is offline). ActivityExecutionStatus.RUNNING covers both SCHEDULED
+// and STARTED PendingActivityState values, so SAA operators have no way to
+// tell from the list view whether their activity is actually progressing or
+// stuck waiting for a worker. The fix may be server-side (split the status,
+// or expose run_state in the list payload) or CLI-side (cross-reference with
+// describe), but either way the row for an unstarted SAA must not display
+// "Running".
+//
+// Expected after fix: an SAA scheduled on a task queue with no worker should
+// not appear with Status=Running in `activity list` text output.
+func (s *SharedServerSuite) TestActivity_List_TextStatusForUnstartedSAA() {
+	uniqueKW := "no-worker-" + uuid.NewString()[:8]
+	activityID := "no-worker-test-" + uniqueKW
+	noWorkerTQ := "no-worker-tq-" + uuid.NewString()[:8]
+
+	res := s.Execute(
+		"activity", "start",
+		"--activity-id", activityID,
+		"--type", "DevActivity",
+		"--task-queue", noWorkerTQ,
+		"--start-to-close-timeout", "300s",
+		"--schedule-to-close-timeout", "600s",
+		"--search-attribute", fmt.Sprintf(`CustomKeywordField="%s"`, uniqueKW),
+		"--address", s.Address(),
+	)
+	s.NoError(res.Err)
+
+	s.Eventually(func() bool {
+		r := s.Execute(
+			"activity", "list",
+			"--query", fmt.Sprintf(`CustomKeywordField = "%s"`, uniqueKW),
+			"--address", s.Address(),
+		)
+		return r.Err == nil && strings.Contains(r.Stdout.String(), activityID)
+	}, 5*time.Second, 200*time.Millisecond)
+
+	res = s.Execute(
+		"activity", "list",
+		"--query", fmt.Sprintf(`CustomKeywordField = "%s"`, uniqueKW),
+		"--address", s.Address(),
+	)
+	s.NoError(res.Err)
+
+	var ourLine string
+	for _, line := range strings.Split(res.Stdout.String(), "\n") {
+		if strings.Contains(line, activityID) {
+			ourLine = line
+			break
+		}
+	}
+	s.NotEmpty(ourLine, "expected to find a list row for activity %s", activityID)
+	// Bug: list shows Status "Running" for activities the server has scheduled
+	// but no worker has picked up.
+	s.NotContainsf(strings.ToUpper(ourLine), "RUNNING",
+		"list status for an SAA on a task queue with no worker should not be 'Running' — it is scheduled, never started; got line: %s",
+		ourLine)
 }
