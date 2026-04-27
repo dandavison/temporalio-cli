@@ -897,6 +897,13 @@ func (c *TemporalActivityUnpauseCommand) run(cctx *CommandContext, args []string
 }
 
 func (c *TemporalActivityResetCommand) run(cctx *CommandContext, args []string) error {
+	// reset is a workflow-activity-only operation; if the user invoked it
+	// with only --activity-id (no --workflow-id and no --query) they are
+	// likely trying to reset a Standalone Activity, which is not supported.
+	if c.ActivityId != "" && c.WorkflowId == "" && c.Query == "" {
+		return fmt.Errorf("reset is not supported for Standalone Activities; for a workflow Activity pass --workflow-id (and optionally --run-id) or use --query for a batch operation")
+	}
+
 	cl, err := dialClient(cctx, &c.Parent.ClientOptions)
 	if err != nil {
 		return err
