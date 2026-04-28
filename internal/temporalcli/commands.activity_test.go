@@ -1335,3 +1335,71 @@ func (s *SharedServerSuite) TestActivity_List_Pagination() {
 	s.NoError(res.Err)
 	s.Equal(3, strings.Count(res.Stdout.String(), "page-test-"))
 }
+
+// Bug: `temporal activity terminate` (and other commands using defaultReason)
+// always renders its default reason as `Requested from CLI by <unknown-user>`
+// on every machine, because the condition in commands.workflow.go's username()
+// is inverted (`err != nil` instead of `err == nil`), so the success branch of
+// `user.Current()` is never taken. This makes the recorded audit trail useless
+// for distinguishing operators.
+//
+// Expected after fix: terminating without `--reason` should record a default
+// reason that does not contain the literal "<unknown-user>".
+func (s *SharedServerSuite) TestActivity_Terminate_DefaultReason_NoUnknownUser() {
+	activityStarted := make(chan struct{})
+	s.Worker().OnDevActivity(func(ctx context.Context, a any) (any, error) {
+		close(activityStarted)
+		<-ctx.Done()
+		return nil, ctx.Err()
+	})
+
+	started := s.startActivity("terminate-default-reason-test")
+	runID := started["runId"].(string)
+	<-activityStarted
+
+	res := s.Execute(
+		"activity", "terminate",
+		"--activity-id", "terminate-default-reason-test",
+		"--run-id", runID,
+		"--address", s.Address(),
+	)
+	s.NoError(res.Err)
+
+	// Wait for the activity to actually transition to TERMINATED, then poll
+	// for its outcome via `activity result -o json` — that command surfaces
+	// the recorded failure message, which is where the termination reason
+	// (the supplied --reason or defaultReason()) lives.
+	handle := s.Client.GetActivityHandle(client.GetActivityHandleOptions{
+		ActivityID: "terminate-default-reason-test",
+		RunID:      runID,
+	})
+	s.Eventually(func() bool {
+		desc, err := handle.Describe(s.Context, client.DescribeActivityOptions{})
+		return err == nil && desc.Status == enums.ACTIVITY_EXECUTION_STATUS_TERMINATED
+	}, 5*time.Second, 100*time.Millisecond)
+
+	res = s.Execute(
+		"activity", "result", "-o", "json",
+		"--activity-id", "terminate-default-reason-test",
+		"--run-id", runID,
+		"--address", s.Address(),
+	)
+	// `result` returns a non-nil err for any non-success outcome; the JSON
+	// payload (with the failure body) is still printed on stdout.
+	s.NotEmptyf(res.Stdout.String(), "activity result should produce output for terminated SAA")
+	var outcome map[string]any
+	s.NoError(json.Unmarshal(res.Stdout.Bytes(), &outcome))
+	failure, _ := outcome["failure"].(map[string]any)
+	s.NotNilf(failure, "activity result -o json for a terminated SAA should include the failure body; got: %s", res.Stdout.String())
+	failureMsg, _ := failure["message"].(string)
+	s.Containsf(failureMsg, "Requested from CLI",
+		"recorded reason should be the CLI-default 'Requested from CLI by <user>' message; got: %q", failureMsg)
+	// Bug: defaultReason() always renders as "Requested from CLI by <unknown-user>"
+	// because of the inverted `err != nil` check in username() in
+	// commands.workflow.go: `if u, err := user.Current(); err != nil && u.Username != ""`
+	// means the success branch of user.Current() is never taken.
+	s.NotContainsf(failureMsg, "<unknown-user>",
+		"default termination reason should not literally contain '<unknown-user>'; "+
+			"the inverted condition in username() makes the user.Current() success path unreachable; got: %q",
+		failureMsg)
+}
