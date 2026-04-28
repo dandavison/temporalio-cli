@@ -1356,12 +1356,16 @@ func (s *SharedServerSuite) TestActivity_Terminate_DefaultReason_NoUnknownUser()
 	)
 	s.NoError(res.Err)
 
-	handle := s.Client.GetActivityHandle(client.GetActivityHandleOptions{
-		ActivityID: "terminate-default-reason-test",
-		RunID:      runID,
-	})
-	err := handle.Get(s.Context, nil)
-	s.Error(err)
-	s.Contains(err.Error(), "Requested from CLI")
-	s.NotContains(err.Error(), "<unknown-user>")
+	res = s.Execute(
+		"activity", "result", "-o", "json",
+		"--activity-id", "terminate-default-reason-test",
+		"--run-id", runID,
+		"--address", s.Address(),
+	)
+	s.Error(res.Err)
+	var outcome map[string]any
+	s.NoError(json.Unmarshal(res.Stdout.Bytes(), &outcome))
+	failureMsg, _ := outcome["failure"].(map[string]any)["message"].(string)
+	s.Contains(failureMsg, "Requested from CLI by")
+	s.NotContains(failureMsg, "<unknown-user>")
 }
