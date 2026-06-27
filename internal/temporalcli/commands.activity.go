@@ -660,7 +660,7 @@ func (c *TemporalActivityUpdateOptionsCommand) run(cctx *CommandContext, args []
 
 	if c.Command.Flags().Changed("task-queue") {
 		activityOptions.TaskQueue = &taskqueuepb.TaskQueue{Name: c.TaskQueue}
-		updatePath = append(updatePath, "task_queue_name")
+		updatePath = append(updatePath, "task_queue.name")
 	}
 
 	if c.Command.Flags().Changed("schedule-to-close-timeout") {
@@ -755,7 +755,8 @@ func (c *TemporalActivityUpdateOptionsCommand) run(cctx *CommandContext, args []
 				UpdateMask: &fieldmaskpb.FieldMask{
 					Paths: updatePath,
 				},
-				Identity: c.Parent.Identity,
+				RestoreOriginal: c.RestoreOriginalOptions,
+				Identity:        c.Parent.Identity,
 			})
 		if err != nil {
 			return fmt.Errorf("unable to update Activity options: %w", err)
@@ -957,9 +958,10 @@ func (c *TemporalActivityResetCommand) run(cctx *CommandContext, args []string) 
 			WorkflowId:     c.WorkflowId,
 			ActivityId:     c.ActivityId,
 			RunId:          c.RunId,
-			Identity:       c.Parent.Identity,
-			KeepPaused:     c.KeepPaused,
-			ResetHeartbeat: c.ResetHeartbeats,
+			Identity:               c.Parent.Identity,
+			KeepPaused:             c.KeepPaused,
+			ResetHeartbeat:         c.ResetHeartbeats,
+			RestoreOriginalOptions: c.RestoreOriginalOptions,
 		}
 
 		resp, err := cl.WorkflowService().ResetActivityExecution(cctx, request)
