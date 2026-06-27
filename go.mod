@@ -17,7 +17,7 @@ require (
 	github.com/stretchr/testify v1.11.1
 	github.com/temporalio/cli/cliext v0.0.0
 	github.com/temporalio/ui-server/v2 v2.49.1
-	go.temporal.io/api v1.62.15-0.20260615235047-378792ab2240
+	go.temporal.io/api v1.62.15-0.20260617201018-baf55f959c5e
 	go.temporal.io/sdk v1.44.1
 	go.temporal.io/sdk/contrib/envconfig v1.0.2
 	go.temporal.io/server v1.29.0-135.0.0.20260616172559-0f70f6096799
@@ -32,6 +32,8 @@ require (
 )
 
 replace github.com/temporalio/cli/cliext => ./cliext
+
+replace go.temporal.io/server => /Users/dan/worktrees/temporal/fredtzeng--saa-start-delay-pause/temporal
 
 require (
 	cel.dev/expr v0.25.1 // indirect

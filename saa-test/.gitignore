@@ -1,0 +1,6 @@
+__pycache__/
+devserver.db
+server.log
+worker.log
+log.text
+bugs/

@@ -1,4 +1,4 @@
-.PHONY: all gen gen-docs build
+.PHONY: all gen gen-docs build saa-build saa-test saa-test-cli saa-test-sdk
 
 all: gen build
 
@@ -23,3 +23,25 @@ gen-docs: internal/temporalcli/commands.yaml cliext/option-sets.yaml
 
 build:
 	go build ./cmd/temporal
+
+# --- Standalone Activity (SAA) test harnesses (saa-test/) -------------------
+# These require `uv` and build the CLI against the local server branch (via the go.mod
+# replace directive) as ./temporal-saa, which both harnesses use to run `server start-dev`
+# and as the client. Pass extra harness flags via SAA_ARGS, e.g.:
+#   make saa-test-sdk SAA_ARGS="--only start_delay.defers_dispatch"
+#   make saa-test-cli SAA_ARGS=--fresh
+
+saa-build:
+	go build -o ./temporal-saa ./cmd/temporal
+
+# CLI-client suite: drives all operations and assertions through the temporal CLI.
+saa-test-cli: saa-build
+	uv run saa-test/saa_test.py $(SAA_ARGS)
+
+# SDK-client suite: drives the client via the Temporal Python SDK; covers start_delay,
+# next_retry_delay, delete, and worker-crash scenarios the CLI cannot reach.
+saa-test-sdk: saa-build
+	uv run saa-test/saa_sdk_test.py $(SAA_ARGS)
+
+# Run both suites.
+saa-test: saa-test-cli saa-test-sdk
