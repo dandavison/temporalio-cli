@@ -23,13 +23,6 @@ log.text. Use --fresh to wipe prior state, --only ID[,ID] to run a subset,
 --rerun-failed to re-run only previously failed/errored tests.
 
 Subcommand `worker` runs the SDK worker (the harness spawns it itself).
-
-To inspect executions in the UI after a run, start a persistent UI-enabled dev
-server yourself and point the harness at it:
-  ./saa_test.py serve                       # terminal 1: grpc :7239, UI :8239
-  ./saa_test.py --address localhost:7239     # terminal 2: drives the tests
-The `serve` server is not torn down, so executions stay browsable afterward.
-Passing `--address` makes the harness reuse that server instead of `start-dev`.
 """
 from __future__ import annotations
 
@@ -362,22 +355,16 @@ def write_bug(test: Test, status: str, err: str, ctx: TestCtx) -> Path:
 # Server / worker process management
 # --------------------------------------------------------------------------
 class DevServer:
-    def __init__(self, port: int, headless: bool = True, wipe: bool = True):
+    def __init__(self, port: int):
         self.port = port
-        self.headless = headless
-        self.wipe = wipe
         self.proc: Optional[subprocess.Popen] = None
 
     @property
     def address(self) -> str:
         return f"localhost:{self.port}"
 
-    @property
-    def ui_url(self) -> str:
-        return f"http://localhost:{self.port + 1000}"
-
     def start(self) -> None:
-        if self.wipe and DB_PATH.exists():
+        if DB_PATH.exists():
             DB_PATH.unlink()
         args = [
             str(CLI_BIN), "server", "start-dev",
@@ -387,9 +374,8 @@ class DevServer:
             "--metrics-port", "0",
             "--db-filename", str(DB_PATH),
             "--log-level", "warn",
+            "--headless",
         ]
-        if self.headless:
-            args.append("--headless")
         for k, v in DYNAMIC_CONFIG.items():
             args += ["--dynamic-config-value", f"{k}={v}"]
         fh = open(SERVER_LOG, "w")
@@ -1689,27 +1675,6 @@ def run_tests(args: argparse.Namespace) -> int:
     return 1 if (failed or errored) else 0
 
 
-def run_serve(port: int, wipe: bool) -> int:
-    """Start a UI-enabled dev server with the SAA dynamic config and keep it running.
-
-    Run this in one terminal, then drive the tests against it from another with
-    `saa_test.py --address localhost:<port>`; the executions remain browsable in
-    the UI after the run since this server is not torn down by the harness."""
-    server = DevServer(port, headless=False, wipe=wipe)
-    cli = CLI(server.address)
-    server.start()
-    server.wait_ready(cli)
-    print(f"dev server ready: grpc={server.address}  ui={server.ui_url}", flush=True)
-    print(f"drive tests with: {sys.argv[0]} --address {server.address}", flush=True)
-    print("Ctrl-C to stop.", flush=True)
-    try:
-        assert server.proc is not None
-        server.proc.wait()
-    except KeyboardInterrupt:
-        server.stop()
-    return 0
-
-
 def main() -> int:
     p = argparse.ArgumentParser(description="SAA CLI test harness")
     sub = p.add_subparsers(dest="cmd")
@@ -1717,10 +1682,6 @@ def main() -> int:
     w = sub.add_parser("worker", help="run the SDK activity worker")
     w.add_argument("--address", required=True)
     w.add_argument("--task-queue", default=WORKER_TQ)
-
-    s = sub.add_parser("serve", help="start a UI-enabled dev server and keep it running")
-    s.add_argument("--port", type=int, default=7239)
-    s.add_argument("--fresh", action="store_true", help="wipe the dev server DB on start")
 
     p.add_argument("--address", help="use an already-running server instead of start-dev")
     p.add_argument("--only", help="comma-separated test ids to run")
@@ -1734,11 +1695,6 @@ def main() -> int:
     if args.cmd == "worker":
         run_worker(args.address, args.task_queue)
         return 0
-    if args.cmd == "serve":
-        if not CLI_BIN.exists():
-            print(f"CLI binary not found at {CLI_BIN}; build it first.", file=sys.stderr)
-            return 2
-        return run_serve(args.port, args.fresh)
     if args.list:
         for t in REGISTRY:
             print(f"{t.id}{'  [worker]' if t.needs_worker else ''}")
