@@ -33,7 +33,7 @@ require (
 
 replace github.com/temporalio/cli/cliext => ./cliext
 
-replace go.temporal.io/server => /Users/dan/worktrees/temporal/dan--saa-operator-api-6/temporal
+replace go.temporal.io/server => /Users/dan/worktrees/temporal/dan--saa-operator-api-7/temporal
 
 require (
 	cel.dev/expr v0.25.1 // indirect
